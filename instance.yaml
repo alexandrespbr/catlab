@@ -2,12 +2,16 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   AWS CloudFormation Sample Template
 Parameters:
-  myVPCs: 
+  myVPC: 
     Description: Amazon VPCs
     Type: "AWS::EC2::VPC::Id"
-  mySubnets: 
+  mySubnet: 
     Description: Amazon Subnets
-    Type: "List<AWS::EC2::Subnet::Id>"
+    Type: "AWS::EC2::Subnet::Id"
+  mytagvalue: 
+    Description: Insert a name for you EC2 Instance - REQUIRED
+    Type: "String"
+    AllowedPattern: ".+"
   SSHLocation:
     Description: The IP address range that can be used to SSH to the EC2 instances
     Type: String
@@ -16,6 +20,32 @@ Parameters:
     Default: 0.0.0.0/0
     AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
     ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t1.micro
+      - t2.nano
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+      - m4.large
+      - m4.xlarge
+      - m4.2xlarge
+      - m4.4xlarge
+      - c4.large
+      - c4.xlarge
+      - c4.2xlarge
+      - c4.4xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+Mappings:
+  RegionMap: 
+    us-east-1: 
+      HVM64: "ami-04d29b6f966df1537"
+    sa-east-1: 
+      HVM64: "ami-0096398577720a4a3"
 Resources:
   IAMRole:
     Type: AWS::IAM::Role
@@ -43,15 +73,18 @@ Resources:
   EC2Instance:
     Type: 'AWS::EC2::Instance'
     Properties:
-      InstanceType: t3.micro
+      InstanceType: !Ref InstanceType
       SecurityGroupIds: 
         - !Ref InstanceSecurityGroup
-      ImageId: ami-0947d2ba12ee1ff75
-      SubnetId: !ImportValue ExPrivateSubnet1
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - HVM64
+      SubnetId: !Ref mySubnet
       IamInstanceProfile: !Ref InstanceProfile
       Tags:
         - Key: Name
-          Value: MyTestEC2-01
+          Value: !Ref mytagvalue
         - Key: Project
           Value: internalpoc
   InstanceSecurityGroup:
