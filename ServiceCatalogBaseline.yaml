@@ -314,12 +314,19 @@ Resources:
     Properties:
       DisplayName: "Operation Product Created"
 
+  # OperationCreatedSubscription:
+  #   Type: "AWS::SNS::Subscription"
+  #   Properties:
+  #     TopicArn: !Ref OperationCreatedTopic
+  #     Endpoint: andrdal@amazon.com
+  #     Protocol: email
+
   VPCCreatedLaunchNotification:
     Type: "AWS::ServiceCatalog::LaunchNotificationConstraint"
     Properties:
-      Description: "Publishes notifications when a VPC is provisioned."
+      Description: "Publishes notifications when a EC2 Linux is provisioned."
       NotificationArns:
         - !Ref OperationCreatedTopic
       PortfolioId: !Ref BaselinePortfolio
-      ProductId: !Ref VPCProduct
-    DependsOn: VPCAssociation
+      ProductId: !Ref EC2LinuxProduct
+    DependsOn: LinuxAssociation
