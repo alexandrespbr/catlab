@@ -8,9 +8,6 @@ Parameters:
   mySubnets: 
     Description: Amazon Subnets
     Type: "List<AWS::EC2::Subnet::Id>"
-  myImagesIds: 
-    Description: Amazon Images
-    Type: "AWS::EC2::Image::Id"
   SSHLocation:
     Description: The IP address range that can be used to SSH to the EC2 instances
     Type: String
