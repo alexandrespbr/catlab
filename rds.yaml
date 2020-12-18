@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation Sample Template RDS.
+Parameters:
+  DBUser:
+    NoEcho: 'true'
+    Description: The database admin account username
+    Type: String
+    Default: admin
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBPassword:
+    NoEcho: 'true'
+    Description: The database admin account password
+    Type: String
+    Default: 123Mudar
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: must contain only alphanumeric characters.
+Resources:
+  myDB:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      AllocatedStorage: '100'
+      DBInstanceClass: db.t2.small
+      DBSubnetGroupName: !Ref myDBSubnetGroup
+      Engine: MySQL
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+  myDBSubnetGroup: 
+    Properties: 
+      DBSubnetGroupDescription: MyRDsSubnetGroup
+      SubnetIds: 
+        - !ImportValue ExPrivateSubnet1
+        - !ImportValue ExPrivateSubnet2
+      Tags: 
+        - 
+          Key: String
+          Value: String
+    Type: "AWS::RDS::DBSubnetGroup"

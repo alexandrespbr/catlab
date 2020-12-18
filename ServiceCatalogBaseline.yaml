@@ -1,0 +1,359 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Baseline IAM resources for new account
+
+Resources:
+#portfolio creation
+  BaselinePortfolio:
+    Type: "AWS::ServiceCatalog::Portfolio"
+    Properties:
+      DisplayName: "BaselinePortfolio"
+      AcceptLanguage: "en"
+      Description: "A portfolio of self-service AWS products."
+      ProviderName: "IT"
+
+#products creation
+# you can find samples templates on https://github.com/aws-samples/aws-service-catalog-reference-architectures
+
+  VPCProduct:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "This product builds one Amazon VPC for Embratel workloads"
+      Distributor: "Amazon"
+      Name: "Amazon Private VPC"
+      Owner: "IT Services"
+      SupportEmail: "mspembratel@operacaomulticloud.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "Private VPC"
+        Name: "Private VPC"
+        Info:
+          LoadTemplateFromURL : "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/vpc/sc-vpc-ra.json"
+          #LoadTemplateFromURL : "https://s3.amazonaws.com/Embratel-sa-servicecatalogtemplates/Embratel-vpc.json"
+
+  EC2LinuxProduct:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "This product builds one Amazon Linux EC2 instance and create a SSM patch baseline, maintenance window, and patch task to scan for and install operating system updates the EC2 instance."
+      Distributor: "Amazon"
+      Name: "Amazon Elastic Compute Cloud (EC2) Linux"
+      Owner: "IT Services"
+      SupportEmail: "mspembratel@operacaomulticloud.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "Linux EC2 Instance"
+        Name: "Linux EC2 Instance"
+        Info:
+          LoadTemplateFromURL : "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/ec2/sc-ec2-linux-ra.json"
+          #LoadTemplateFromURL : "https://s3.amazonaws.com/Embratel-sa-servicecatalogtemplates/ec2-linux-ssm.json"
+
+  EC2WindowsProduct:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "This product builds one Amazon Windows EC2 instance and create a SSM patch baseline, maintenance window, and patch task to scan for and install operating system updates the EC2 instance."
+      Distributor: "Amazon"
+      Name: "Amazon Elastic Compute Cloud (EC2) Windows"
+      Owner: "IT Services"
+      SupportEmail: "mspembratel@operacaomulticloud.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "Windows EC2 Instance"
+        Name: "Windows EC2 Instance"
+        Info:
+          LoadTemplateFromURL : "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/ec2/sc-ec2-windows-ra.json"
+          #LoadTemplateFromURL : "https://s3.amazonaws.com/Embratel-sa-servicecatalogtemplates/ec2-windows-ssm.json"
+
+  MSSqlProduct:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "This product builds one RDS Microsoft SQL Database."
+      Distributor: "Amazon"
+      Name: "Relation Database Service MS Sql Server"
+      Owner: "IT Services"
+      SupportEmail: "mspembratel@operacaomulticloud.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "RDS MS SQL Server"
+        Name: "RDS MS SQL Server"
+        Info:
+          LoadTemplateFromURL : "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/rds/sc-rds-mssql-ra.json"
+
+  MysqlProduct:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "This product builds one RDS MySql Instance."
+      Distributor: "Amazon"
+      Name: "Relation Database Service MySql Server"
+      Owner: "IT Services"
+      SupportEmail: "mspembratel@operacaomulticloud.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "RDS MySql Server"
+        Name: "RDS MySql Server"
+        Info:
+          LoadTemplateFromURL : "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/rds/sc-rds-mysql-ra.json"
+
+  S3BucketProduct:
+    Type: "AWS::ServiceCatalog::CloudFormationProduct"
+    Properties:
+      AcceptLanguage: "en"
+      Description: "This product allows the user to create an S3 Bucket locking down the access to a specific CIDR."
+      Distributor: "Amazon"
+      Name: "S3 Bucket Product"
+      Owner: "IT Services"
+      SupportEmail: "mspembratel@operacaomulticloud.com"
+      SupportUrl: "https://www.amazon.com"
+      SupportDescription: "Support Description"
+      ProvisioningArtifactParameters:
+      -
+        Description: "Bucket S3"
+        Name: "Bucket S3"
+        Info:
+          LoadTemplateFromURL: "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/s3/sc-s3-cidr-ra.json"
+
+#association between products and portfolio
+
+  LinuxAssociation:
+    Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+    Properties:
+      ProductId: !Ref EC2LinuxProduct
+      PortfolioId: !Ref BaselinePortfolio
+
+  WindowsAssociation:
+    Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+    Properties:
+      ProductId: !Ref EC2WindowsProduct
+      PortfolioId: !Ref BaselinePortfolio
+
+  VPCAssociation:
+     Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+     Properties:
+       ProductId: !Ref VPCProduct
+       PortfolioId: !Ref BaselinePortfolio
+
+  RdsMSSqlAssociation:
+     Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+     Properties:
+       ProductId: !Ref MSSqlProduct
+       PortfolioId: !Ref BaselinePortfolio
+
+  RdsMySqlAssociation:
+     Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+     Properties:
+       ProductId: !Ref MysqlProduct
+       PortfolioId: !Ref BaselinePortfolio
+
+  S3BucketAssociation:
+     Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
+     Properties:
+       ProductId: !Ref S3BucketProduct
+       PortfolioId: !Ref BaselinePortfolio
+  
+# IAM group with access on portfolio to run the products provisioning
+#TODO add the TIVIT CrossAccount Role
+  EngineeringGroup:
+    Type: "AWS::IAM::Group"
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSServiceCatalogEndUserFullAccess
+
+  BaselinePortfolioPrincipalAssociation:
+    Type: "AWS::ServiceCatalog::PortfolioPrincipalAssociation"
+    Properties:
+      PortfolioId: !Ref BaselinePortfolio
+      PrincipalARN: !GetAtt EngineeringGroup.Arn
+      PrincipalType: "IAM"
+
+  BaselinePortfolioOrgPrincipalAssociation:
+    Type: "AWS::ServiceCatalog::PortfolioPrincipalAssociation"
+    Properties:
+      PortfolioId: !Ref BaselinePortfolio
+      #PrincipalARN: !Sub '${IamRoleName.Arn}'
+      PrincipalARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/AWSControlTowerExecution"
+      PrincipalType: "IAM"
+
+  # BaselinePortfolioAWSStackSetExecutionRoleAssociation:
+  #   Type: "AWS::ServiceCatalog::PortfolioPrincipalAssociation"
+  #   Properties:
+  #     PortfolioId: !Ref BaselinePortfolio
+  #     PrincipalARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/AWSCloudFormationStackSetExecutionRole"
+  #     PrincipalType: "IAM"
+
+#default tags values
+  VpcTagOption:
+    Type: "AWS::ServiceCatalog::TagOption"
+    Properties:
+      Key: "tgw-attachment"
+      Value: "tgw-attachment"
+
+  LinuxInstaceTypeTagOption:
+    Type: "AWS::ServiceCatalog::TagOption"
+    Properties:
+      Key: "InstanceType"
+      Value: "Linux"
+
+  WindowsInstanceTypeOption:
+    Type: "AWS::ServiceCatalog::TagOption"
+    Properties:
+      Key: "InstanceType"
+      Value: "Windows"
+
+  LinuxInstaceTypeTagOptionAssociation:
+    Type: "AWS::ServiceCatalog::TagOptionAssociation"
+    Properties:
+      ResourceId: !Ref EC2LinuxProduct
+      TagOptionId: !Ref LinuxInstaceTypeTagOption
+
+  WindowsInstaceTypeTagOptionAssociation:
+    Type: "AWS::ServiceCatalog::TagOptionAssociation"
+    Properties:
+      ResourceId: !Ref EC2WindowsProduct
+      TagOptionId: !Ref WindowsInstanceTypeOption
+
+  VPCProductTagOptionAssociation:
+    Type: "AWS::ServiceCatalog::TagOptionAssociation"
+    Properties:
+      ResourceId: !Ref VPCProduct
+      TagOptionId: !Ref VpcTagOption
+
+
+#Prducts constraints association
+  VPCBaselineLaunchConstraint:
+    Type: "AWS::ServiceCatalog::LaunchRoleConstraint"
+    Properties:
+      Description: "Allows the product to launch with the policies granted by the associated role."
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref VPCProduct
+      RoleArn: !GetAtt LaunchConstraintRole.Arn
+    DependsOn: VPCAssociation
+
+  LinuxLaunchConstraint:
+    Type: "AWS::ServiceCatalog::LaunchRoleConstraint"
+    Properties:
+      Description: "Allows the product to launch with the policies granted by the associated role."
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref EC2LinuxProduct
+      RoleArn: !GetAtt LaunchConstraintRole.Arn
+    DependsOn: LinuxAssociation
+
+  WindowsLaunchConstraint:
+    Type: "AWS::ServiceCatalog::LaunchRoleConstraint"
+    Properties:
+      Description: "Allows the product to launch with the policies granted by the associated role."
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref EC2WindowsProduct
+      RoleArn: !GetAtt LaunchConstraintRole.Arn
+    DependsOn: WindowsAssociation
+
+  RdsMSSqlLaunchConstraint:
+    Type: "AWS::ServiceCatalog::LaunchRoleConstraint"
+    Properties:
+      Description: "Allows the product to launch with the policies granted by the associated role."
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref MSSqlProduct
+      RoleArn: !GetAtt LaunchConstraintRole.Arn
+    DependsOn: RdsMSSqlAssociation
+
+  RdsMysqlLaunchConstraint:
+    Type: "AWS::ServiceCatalog::LaunchRoleConstraint"
+    Properties:
+      Description: "Allows the product to launch with the policies granted by the associated role."
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref MysqlProduct
+      RoleArn: !GetAtt LaunchConstraintRole.Arn
+    DependsOn: RdsMySqlAssociation
+
+  S3BucketLaunchConstraint:
+    Type: "AWS::ServiceCatalog::LaunchRoleConstraint"
+    Properties:
+      Description: "Allows the product to launch with the policies granted by the associated role."
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref S3BucketProduct
+      RoleArn: !GetAtt LaunchConstraintRole.Arn
+    DependsOn: S3BucketAssociation
+
+#constraint role with SC permission to provisioning AWS services
+#TODO: Embratel TEAM MUST REVIEW THIS PERMISSIONS
+
+  LaunchConstraintRole:
+    Type: "AWS::IAM::Role"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F38
+            reason: "Service Catalog Requirement"
+          - id: F3
+            reason: "Service Catalog Requirement"
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "servicecatalog.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "AllowProductLaunch"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: '*'
+                Effect: "Allow"
+                Action:
+                  # Permissions required for the provisioning the products
+                  - rds:*
+                  - ec2:*
+                  - s3:*
+                  - ssm:*
+                  - iam:*
+                  - lambda:*
+                  - cloudformation:*
+                  - servicecatalog:*
+              - Resource:
+                  - "arn:aws:cloudformation:*:*:stack/SC-*"
+                  - "arn:aws:cloudformation:*:*:changeSet/SC-*"
+                Effect: "Allow"
+                Action:
+                  # Permissions required by AWS Service Catalog to create stack
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStacks
+                  - cloudformation:SetStackPolicy
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:UpdateStack
+              - Resource: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EngineeringCreatedTopic.TopicName}"
+                Effect: "Allow"
+                Action:
+                  - sns:Publish
+
+#SNS topic notification when a new product is provisioned
+  EngineeringCreatedTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: "Engineering Product Created"
+
+  VPCCreatedLaunchNotification:
+    Type: "AWS::ServiceCatalog::LaunchNotificationConstraint"
+    Properties:
+      Description: "Publishes notifications when a VPC is provisioned."
+      NotificationArns:
+        - !Ref EngineeringCreatedTopic
+      PortfolioId: !Ref BaselinePortfolio
+      ProductId: !Ref VPCProduct
+    DependsOn: VPCAssociation
