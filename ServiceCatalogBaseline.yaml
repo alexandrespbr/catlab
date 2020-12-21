@@ -30,7 +30,7 @@ Resources:
         Description: "Private VPC"
         Name: "Private VPC"
         Info:
-          LoadTemplateFromURL : "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/vpc/sc-vpc-ra.json"
+          LoadTemplateFromURL : "https://raw.githubusercontent.com/alexandrespbr/catlab/main/vpc.yaml"
           #LoadTemplateFromURL : "https://s3.amazonaws.com/Embratel-sa-servicecatalogtemplates/Embratel-vpc.json"
 
   EC2LinuxProduct:
@@ -172,8 +172,8 @@ Resources:
   VpcTagOption:
     Type: "AWS::ServiceCatalog::TagOption"
     Properties:
-      Key: "tgw-attachment"
-      Value: "tgw-attachment"
+      Key: "Project"
+      Value: "Dev"
 
   LinuxInstaceTypeTagOption:
     Type: "AWS::ServiceCatalog::TagOption"

@@ -164,14 +164,6 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  DefaultPublicRouteTGW:
-    Type: AWS::EC2::Route
-    DependsOn: myTransitGatewayVpcAttachment
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 10.191.0.0/16
-      TransitGatewayId: !Ref myTransitGateway
-
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -200,14 +192,6 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway1
 
-  DefaultPrivateRoute1TGW:
-    Type: AWS::EC2::Route
-    DependsOn: myTransitGatewayVpcAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable1
-      DestinationCidrBlock: 10.191.0.0/16
-      TransitGatewayId: !Ref myTransitGateway
-
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -229,14 +213,6 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable2
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway2
-
-  DefaultPrivateRoute2TGW:
-    Type: AWS::EC2::Route
-    DependsOn: myTransitGatewayVpcAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      DestinationCidrBlock: 10.191.0.0/16
-      TransitGatewayId: !Ref myTransitGateway
 
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -298,34 +274,6 @@ Resources:
       PrivateDnsEnabled: true
       ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
       VpcId: !Ref VPC
-
-  myTransitGateway:
-    Type: "AWS::EC2::TransitGateway"
-    Properties:
-      AmazonSideAsn: 65000
-      Description: "TGW Test"
-      AutoAcceptSharedAttachments: "enable"
-      DefaultRouteTableAssociation: "enable"
-      DnsSupport: "enable"
-      VpnEcmpSupport: "enable"
-      Tags:
-      - Key: Name
-        Value: MyTGW
-      - Key: Application
-        Value: !Ref 'AWS::StackId'
-
-  myTransitGatewayVpcAttachment:
-    Type: AWS::EC2::TransitGatewayAttachment
-    DependsOn: myTransitGateway
-    Properties:
-      SubnetIds:
-        - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-      TransitGatewayId: !Ref myTransitGateway
-      VpcId: !Ref VPC
-      Tags:
-      - Key: Name
-        Value: "TransitGatewayVpcAttachment"
 
 Outputs:
   MyVPC:
