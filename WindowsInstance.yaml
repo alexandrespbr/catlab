@@ -17,7 +17,6 @@ Parameters:
     Type: String
     Default: t2.micro
     AllowedValues:
-      - t1.micro
       - t2.nano
       - t2.micro
       - t2.small

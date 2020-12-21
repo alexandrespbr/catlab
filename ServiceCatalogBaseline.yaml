@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Baseline IAM resources for new account
+Description: Baseline Resources for Service Catalog - 21/12
 
 Resources:
 #portfolio creation
