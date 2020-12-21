@@ -49,7 +49,7 @@ Resources:
         Description: "Linux EC2 Instance"
         Name: "Linux EC2 Instance"
         Info:
-          LoadTemplateFromURL : "https://raw.githubusercontent.com/alexandrespbr/catlab/main/instance.yaml"
+          LoadTemplateFromURL : "https://raw.githubusercontent.com/alexandrespbr/catlab/main/LinuxInstance.yaml"
           #LoadTemplateFromURL : "https://s3.amazonaws.com/Embratel-sa-servicecatalogtemplates/ec2-linux-ssm.json"
 
   EC2WindowsProduct:
@@ -68,7 +68,7 @@ Resources:
         Description: "Windows EC2 Instance"
         Name: "Windows EC2 Instance"
         Info:
-          LoadTemplateFromURL : "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/ec2/sc-ec2-windows-ra.json"
+          LoadTemplateFromURL : "https://raw.githubusercontent.com/alexandrespbr/catlab/main/WindowsInstance.yaml"
           #LoadTemplateFromURL : "https://s3.amazonaws.com/Embratel-sa-servicecatalogtemplates/ec2-windows-ssm.json"
 
   MysqlProduct:

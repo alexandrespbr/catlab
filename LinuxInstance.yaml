@@ -13,7 +13,7 @@ Parameters:
     Type: "String"
     AllowedPattern: ".+"
   InstanceType:
-    Description: WebServer EC2 instance type
+    Description: Linux EC2 Instance Type
     Type: String
     Default: t2.micro
     AllowedValues:
@@ -42,7 +42,7 @@ Resources:
   IAMRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: SSMRoletoEC2
+      RoleName: Linux-SSMRoletoEC2
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:

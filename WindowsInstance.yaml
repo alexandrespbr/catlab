@@ -13,7 +13,7 @@ Parameters:
     Type: "String"
     AllowedPattern: ".+"
   InstanceType:
-    Description: WebServer EC2 instance type
+    Description: Windows EC2 Instance Type
     Type: String
     Default: t2.micro
     AllowedValues:
@@ -35,14 +35,14 @@ Parameters:
 Mappings:
   RegionMap: 
     us-east-1: 
-      HVM64: "ami-04d29b6f966df1537"
+      HVM64: "ami-0229f7666f517b31e"
     sa-east-1: 
-      HVM64: "ami-0096398577720a4a3"
+      HVM64: "ami-0378a9d5ce02e41c5"
 Resources:
   IAMRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: SSMRoletoEC2
+      RoleName: Windows-SSMRoletoEC2
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -82,12 +82,12 @@ Resources:
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupDescription: Enable SSH access via port 22 and 443
+      GroupDescription: Enable RDP access via port 3389
       VpcId: !Ref myVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: '22'
-          ToPort: '22'
+          FromPort: '3389'
+          ToPort: '3389'
 Outputs:
   InstanceId:
     Description: InstanceId of the newly created EC2 instance
