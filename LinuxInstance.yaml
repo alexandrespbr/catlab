@@ -100,11 +100,11 @@ Outputs:
   IAMRole:
     Value: !Ref IAMRole
     Export:
-      Name: ExpIAMRole
+      Name: ExpLinuxIAMRole
   InstanceProfile:
     Value: !Ref InstanceProfile
     Export:
-      Name: ExpInstanceProfile
+      Name: ExpLinuxInstanceProfile
   InstanceSecurityGroup:
     Value: !Ref InstanceSecurityGroup
     Export:
