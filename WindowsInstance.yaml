@@ -42,7 +42,7 @@ Resources:
   IAMRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: Windows-SSMRoletoEC2
+      RoleName: !Sub Windows-SSMRoletoEC2-${AWS::StackName}
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
