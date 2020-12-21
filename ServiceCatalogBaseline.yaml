@@ -20,15 +20,15 @@ Resources:
       AcceptLanguage: "en"
       Description: "This product builds one Amazon VPC for Embratel workloads"
       Distributor: "Amazon"
-      Name: "Amazon Private VPC"
+      Name: "Amazon VPC with Public and Private Subnets"
       Owner: "IT Services"
       SupportEmail: "mspembratel@operacaomulticloud.com"
       SupportUrl: "https://www.amazon.com"
       SupportDescription: "Support Description"
       ProvisioningArtifactParameters:
       -
-        Description: "Private VPC"
-        Name: "Private VPC"
+        Description: "VPC"
+        Name: "VPC"
         Info:
           LoadTemplateFromURL : "https://raw.githubusercontent.com/alexandrespbr/catlab/main/vpc.yaml"
           #LoadTemplateFromURL : "https://s3.amazonaws.com/Embratel-sa-servicecatalogtemplates/Embratel-vpc.json"
