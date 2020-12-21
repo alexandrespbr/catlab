@@ -89,24 +89,6 @@ Resources:
         Info:
           LoadTemplateFromURL : "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/rds/sc-rds-mysql-ra.json"
 
-  S3BucketProduct:
-    Type: "AWS::ServiceCatalog::CloudFormationProduct"
-    Properties:
-      AcceptLanguage: "en"
-      Description: "This product allows the user to create an S3 Bucket locking down the access to a specific CIDR."
-      Distributor: "Amazon"
-      Name: "S3 Bucket Product"
-      Owner: "IT Services"
-      SupportEmail: "mspembratel@operacaomulticloud.com"
-      SupportUrl: "https://www.amazon.com"
-      SupportDescription: "Support Description"
-      ProvisioningArtifactParameters:
-      -
-        Description: "Bucket S3"
-        Name: "Bucket S3"
-        Info:
-          LoadTemplateFromURL: "https://raw.githubusercontent.com/aws-samples/aws-service-catalog-reference-architectures/master/s3/sc-s3-cidr-ra.json"
-
 #association between products and portfolio
 
   LinuxAssociation:
@@ -131,12 +113,6 @@ Resources:
      Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
      Properties:
        ProductId: !Ref MysqlProduct
-       PortfolioId: !Ref BaselinePortfolio
-
-  S3BucketAssociation:
-     Type: "AWS::ServiceCatalog::PortfolioProductAssociation"
-     Properties:
-       ProductId: !Ref S3BucketProduct
        PortfolioId: !Ref BaselinePortfolio
   
 # IAM group with access on portfolio to run the products provisioning
@@ -242,15 +218,6 @@ Resources:
       ProductId: !Ref MysqlProduct
       RoleArn: !GetAtt LaunchConstraintRole.Arn
     DependsOn: RdsMySqlAssociation
-
-  S3BucketLaunchConstraint:
-    Type: "AWS::ServiceCatalog::LaunchRoleConstraint"
-    Properties:
-      Description: "Allows the product to launch with the policies granted by the associated role."
-      PortfolioId: !Ref BaselinePortfolio
-      ProductId: !Ref S3BucketProduct
-      RoleArn: !GetAtt LaunchConstraintRole.Arn
-    DependsOn: S3BucketAssociation
 
 #constraint role with SC permission to provisioning AWS services
 #TODO: Embratel TEAM MUST REVIEW THIS PERMISSIONS

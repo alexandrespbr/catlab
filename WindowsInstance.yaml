@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  AWS CloudFormation Sample Template
+  AWS CloudFormation Sample Windows Template
 Parameters:
   myVPC: 
     Description: Amazon VPCs
