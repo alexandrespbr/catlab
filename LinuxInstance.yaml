@@ -99,13 +99,7 @@ Outputs:
       - AvailabilityZone
   IAMRole:
     Value: !Ref IAMRole
-    Export:
-      Name: ExpLinuxIAMRole
   InstanceProfile:
     Value: !Ref InstanceProfile
-    Export:
-      Name: ExpLinuxInstanceProfile
   InstanceSecurityGroup:
     Value: !Ref InstanceSecurityGroup
-    Export:
-      Name: ExpInstanceSecurityGroup
