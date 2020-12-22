@@ -162,11 +162,23 @@ Resources:
       Key: "InstanceType"
       Value: "Windows"
 
+  isDeployedbySC:
+    Type: "AWS::ServiceCatalog::TagOption"
+    Properties:
+      Key: "deployedBy"
+      Value: "serviceCatalog"
+
   LinuxInstaceTypeTagOptionAssociation:
     Type: "AWS::ServiceCatalog::TagOptionAssociation"
     Properties:
       ResourceId: !Ref EC2LinuxProduct
       TagOptionId: !Ref LinuxInstaceTypeTagOption
+
+  LinuxInstaceTypeTagOptionAssociation02:
+    Type: "AWS::ServiceCatalog::TagOptionAssociation"
+    Properties:
+      ResourceId: !Ref EC2LinuxProduct
+      TagOptionId: !Ref isDeployedbySC
 
   WindowsInstaceTypeTagOptionAssociation:
     Type: "AWS::ServiceCatalog::TagOptionAssociation"
@@ -174,11 +186,23 @@ Resources:
       ResourceId: !Ref EC2WindowsProduct
       TagOptionId: !Ref WindowsInstanceTypeOption
 
+  WindowsInstaceTypeTagOptionAssociation02:
+    Type: "AWS::ServiceCatalog::TagOptionAssociation"
+    Properties:
+      ResourceId: !Ref EC2WindowsProduct
+      TagOptionId: !Ref isDeployedbySC
+
   VPCProductTagOptionAssociation:
     Type: "AWS::ServiceCatalog::TagOptionAssociation"
     Properties:
       ResourceId: !Ref VPCProduct
       TagOptionId: !Ref VpcTagOption
+
+  VPCProductTagOptionAssociation02:
+    Type: "AWS::ServiceCatalog::TagOptionAssociation"
+    Properties:
+      ResourceId: !Ref VPCProduct
+      TagOptionId: !Ref isDeployedbySC
 
 #Prducts constraints association
   VPCBaselineLaunchConstraint:
