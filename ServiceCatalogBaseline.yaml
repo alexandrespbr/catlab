@@ -122,21 +122,21 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AWSServiceCatalogEndUserFullAccess
 
-  BaselinePortfolioPrincipalAssociation:
+  BaselinePortfolioPrincipalAssociation01:
     Type: "AWS::ServiceCatalog::PortfolioPrincipalAssociation"
     Properties:
       PortfolioId: !Ref BaselinePortfolio
       PrincipalARN: !GetAtt OperationGroup.Arn
       PrincipalType: "IAM"
 
-  BaselinePortfolioOrgPrincipalAssociation:
+  BaselinePortfolioOrgPrincipalAssociation02:
     Type: "AWS::ServiceCatalog::PortfolioPrincipalAssociation"
     Properties:
       PortfolioId: !Ref BaselinePortfolio
       PrincipalARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/AWSControlTowerExecution"
       PrincipalType: "IAM"
 
-  BaselinePortfolioOrgPrincipalAssociation:
+  BaselinePortfolioOrgPrincipalAssociation03:
     Type: "AWS::ServiceCatalog::PortfolioPrincipalAssociation"
     Properties:
       PortfolioId: !Ref BaselinePortfolio
