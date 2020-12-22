@@ -18,7 +18,7 @@ Resources:
     Type: "AWS::ServiceCatalog::CloudFormationProduct"
     Properties:
       AcceptLanguage: "en"
-      Description: "This product builds one Amazon VPC for Embratel workloads"
+      Description: "This product builds one Amazon VPC for Embratel Workloads"
       Distributor: "Amazon"
       Name: "Amazon VPC with Public and Private Subnets"
       Owner: "IT Services"
@@ -116,7 +116,6 @@ Resources:
        PortfolioId: !Ref BaselinePortfolio
   
 # IAM group with access on portfolio to run the products provisioning
-#TODO add the TIVIT CrossAccount Role
   OperationGroup:
     Type: "AWS::IAM::Group"
     Properties:
@@ -180,7 +179,6 @@ Resources:
     Properties:
       ResourceId: !Ref VPCProduct
       TagOptionId: !Ref VpcTagOption
-
 
 #Prducts constraints association
   VPCBaselineLaunchConstraint:

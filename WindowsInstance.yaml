@@ -35,6 +35,12 @@ Mappings:
   RegionMap: 
     us-east-1: 
       HVM64: "ami-0229f7666f517b31e"
+    us-east-2: 
+      HVM64: "ami-0d5b55fd8cd8738f5"
+    us-west-1: 
+      HVM64: "ami-0ae930fa924b34ed3"
+    us-west-2: 
+      HVM64: "ami-0ae930fa924b34ed3"
     sa-east-1: 
       HVM64: "ami-0378a9d5ce02e41c5"
 Resources:
