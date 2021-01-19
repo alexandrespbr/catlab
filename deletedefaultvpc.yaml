@@ -13,6 +13,7 @@ Parameters:
   RegionsToDeleteFrom:
     Description: "Comma separated list of AWS Regions to delete the default VPC from"
     Type: String
+    Default: "us-east-1"
   DeleteDefaultVPCLambdaExecutionIAMRoleName:
     Description: "Name of the IAM Role that will be created to execute the lambda function"
     Type: String
