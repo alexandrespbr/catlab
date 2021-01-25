@@ -36,12 +36,12 @@ Parameters:
     Default: 10.192.21.0/24
 
   PrivateSubnet3CIDR:
-    Description: Please enter the IP range (CIDR notation) for the private subnet in the third Availability Zone
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
     Default: 10.192.22.0/24
 
   PrivateSubnet4CIDR:
-    Description: Please enter the IP range (CIDR notation) for the private subnet in the fourth Availability Zone
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
     Default: 10.192.23.0/24
 
@@ -134,12 +134,12 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 2, !GetAZs  '' ]
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
       CidrBlock: !Ref PrivateSubnet3CIDR
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ3)
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -147,12 +147,12 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 3, !GetAZs  '' ]
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
       CidrBlock: !Ref PrivateSubnet4CIDR
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ4)
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -262,7 +262,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Routes (AZ3)
+          Value: !Sub ${EnvironmentName} Private Routes (AZ1)
 
   DefaultPrivateRoute3:
     Type: AWS::EC2::Route
@@ -284,7 +284,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Routes (AZ4)
+          Value: !Sub ${EnvironmentName} Private Routes (AZ2)
 
   DefaultPrivateRoute4:
     Type: AWS::EC2::Route
@@ -322,8 +322,6 @@ Resources:
       VpcEndpointType: Interface
       SubnetIds:
         - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-        - !Ref PrivateSubnet3
         - !Ref PrivateSubnet4
       SecurityGroupIds:
         - !Ref IngressSecurityGroup
@@ -337,8 +335,6 @@ Resources:
       VpcEndpointType: Interface
       SubnetIds:
         - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-        - !Ref PrivateSubnet3
         - !Ref PrivateSubnet4
       SecurityGroupIds:
         - !Ref IngressSecurityGroup
@@ -352,8 +348,6 @@ Resources:
       VpcEndpointType: Interface
       SubnetIds:
         - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-        - !Ref PrivateSubnet3
         - !Ref PrivateSubnet4
       SecurityGroupIds:
         - !Ref IngressSecurityGroup

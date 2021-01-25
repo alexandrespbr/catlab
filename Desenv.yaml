@@ -8,54 +8,78 @@ Parameters:
   EnvironmentName:
     Description: An environment name that is prefixed to resource names
     Type: String
-    Default: VPCNetwork
+    Default: Desenv
 
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
-    Default: 10.192.0.0/16
+    Default: 10.193.0.0/23
 
   PublicSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
     Type: String
-    Default: 10.192.10.0/24
+    Default: 10.193.0.0/26
 
   PublicSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
     Type: String
-    Default: 10.192.11.0/24
+    Default: 10.193.0.64/26
 
   PrivateSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.192.20.0/24
+    Default: 10.193.1.0/26
 
   PrivateSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.192.21.0/24
+    Default: 10.193.1.64/26
 
   PrivateSubnet3CIDR:
-    Description: Please enter the IP range (CIDR notation) for the private subnet in the third Availability Zone
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.192.22.0/24
+    Default: 10.193.1.128/26
 
   PrivateSubnet4CIDR:
-    Description: Please enter the IP range (CIDR notation) for the private subnet in the fourth Availability Zone
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.192.23.0/24
-
+    Default: 10.193.1.192/26
+  
   NatGateway: 
     Description: Create NatGateway (Yes or No)?.
-    Default: "No"
+    Default: "Yes"
     Type: String
     AllowedValues: 
       - "Yes"
       - "No"
     ConstraintDescription: must specify Yes or No.
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: "Network Configuration"
+      Parameters:
+      - EnvironmentName
+      - VpcCIDR
+      - NatGateway
+      - TransitGateway
+    - Label:
+        default: "Public Network Configuration"
+      Parameters:
+      - PublicSubnet1CIDR
+      - PublicSubnet2CIDR
+    - Label:
+        default: "Private Network Configuration"
+      Parameters:
+      - PrivateSubnet1CIDR
+      - PrivateSubnet2CIDR
+      - PrivateSubnet3CIDR
+      - PrivateSubnet4CIDR
+
 Conditions: 
   CreateNgwResource: !Equals [ !Ref NatGateway, "Yes" ]
+
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -134,12 +158,12 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 2, !GetAZs  '' ]
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
       CidrBlock: !Ref PrivateSubnet3CIDR
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ3)
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -147,12 +171,12 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 3, !GetAZs  '' ]
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
       CidrBlock: !Ref PrivateSubnet4CIDR
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ4)
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -262,7 +286,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Routes (AZ3)
+          Value: !Sub ${EnvironmentName} Private Routes (AZ1)
 
   DefaultPrivateRoute3:
     Type: AWS::EC2::Route
@@ -284,7 +308,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Routes (AZ4)
+          Value: !Sub ${EnvironmentName} Private Routes (AZ2)
 
   DefaultPrivateRoute4:
     Type: AWS::EC2::Route
@@ -322,8 +346,6 @@ Resources:
       VpcEndpointType: Interface
       SubnetIds:
         - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-        - !Ref PrivateSubnet3
         - !Ref PrivateSubnet4
       SecurityGroupIds:
         - !Ref IngressSecurityGroup
@@ -337,8 +359,6 @@ Resources:
       VpcEndpointType: Interface
       SubnetIds:
         - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-        - !Ref PrivateSubnet3
         - !Ref PrivateSubnet4
       SecurityGroupIds:
         - !Ref IngressSecurityGroup
@@ -352,8 +372,6 @@ Resources:
       VpcEndpointType: Interface
       SubnetIds:
         - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-        - !Ref PrivateSubnet3
         - !Ref PrivateSubnet4
       SecurityGroupIds:
         - !Ref IngressSecurityGroup
@@ -361,12 +379,40 @@ Resources:
       ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
       VpcId: !Ref VPC
 
+  myPublicNetworkResourceShare:
+    Type: "AWS::RAM::ResourceShare"
+    DependsOn: CreateVpcEndpointEC2Messages
+    Properties:
+      Name: "My Public Subnet Share"
+      ResourceArns:
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet1}"
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet2}"
+      Principals:
+        - "702155020857"
+      Tags:
+        - Key: "Name"
+          Value: "CentralPublicSubnetSharing"
+
+  myPrivateDesenvNetworkResourceShare:
+    Type: "AWS::RAM::ResourceShare"
+    DependsOn: CreateVpcEndpointEC2Messages
+    Properties:
+      Name: "My Desenv Subnet Share"
+      ResourceArns:
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet1}"
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet2}"
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet3}"
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet4}"
+      Principals:
+        - "702155020857"
+      Tags:
+        - Key: "Name"
+          Value: "Central Desenv SubnetSharing"
+
 Outputs:
   MyVPC:
     Description: A reference to the created VPC
     Value: !Ref VPC
-    Export:
-      Name: MyVPCId
 
   PublicSubnets:
     Description: A list of the public subnets
@@ -379,41 +425,27 @@ Outputs:
   PublicSubnet1:
     Description: A reference to the public subnet in the 1st Availability Zone
     Value: !Ref PublicSubnet1
-    Export:
-      Name: ExPublicSubnet1
 
   PublicSubnet2:
     Description: A reference to the public subnet in the 2nd Availability Zone
     Value: !Ref PublicSubnet2
-    Export:
-      Name: ExPublicSubnet2
 
   PrivateSubnet1:
     Description: A reference to the private subnet in the 1st Availability Zone
     Value: !Ref PrivateSubnet1
-    Export:
-      Name: ExPrivateSubnet1
 
   PrivateSubnet2:
     Description: A reference to the private subnet in the 2nd Availability Zone
     Value: !Ref PrivateSubnet2
-    Export:
-      Name: ExPrivateSubnet2
 
   PrivateSubnet3:
     Description: A reference to the private subnet in the 3th Availability Zone
     Value: !Ref PrivateSubnet3
-    Export:
-      Name: ExPrivateSubnet3
 
   PrivateSubnet4:
     Description: A reference to the private subnet in the 4th Availability Zone
     Value: !Ref PrivateSubnet4
-    Export:
-      Name: ExPrivateSubnet4
 
   IngressSecurityGroup:
     Description: Security group with no ingress rule
     Value: !Ref IngressSecurityGroup
-    Export:
-      Name: ExIngressSecurityGroup
