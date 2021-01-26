@@ -8,88 +8,54 @@ Parameters:
   EnvironmentName:
     Description: An environment name that is prefixed to resource names
     Type: String
-    Default: Egress
+    Default: VPCNetwork
 
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
-    Default: 10.192.0.0/23
+    Default: 172.16.0.0/16
 
   PublicSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
     Type: String
-    Default: 10.192.0.0/26
+    Default: 172.16.10.0/24
 
   PublicSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
     Type: String
-    Default: 10.192.0.64/26
+    Default: 172.16.11.0/24
 
   PrivateSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.192.1.0/26
+    Default: 172.16.20.0/24
 
   PrivateSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.192.1.64/26
+    Default: 172.16.21.0/24
 
   PrivateSubnet3CIDR:
-    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the third Availability Zone
     Type: String
-    Default: 10.192.1.224/28
+    Default: 172.16.22.0/24
 
   PrivateSubnet4CIDR:
-    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the fourth Availability Zone
     Type: String
-    Default: 10.192.1.240/28
+    Default: 172.16.23.0/24
 
   NatGateway: 
     Description: Create NatGateway (Yes or No)?.
-    Default: "Yes"
-    Type: String
-    AllowedValues:
-      - "Yes"
-      - "No"
-    ConstraintDescription: must specify Yes or No.
-
-  TransitGateway: 
-    Description: Create TransitGateway (Yes or No)?.
-    Default: "Yes"
+    Default: "No"
     Type: String
     AllowedValues: 
       - "Yes"
       - "No"
     ConstraintDescription: must specify Yes or No.
 
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterGroups:
-    - Label:
-        default: "Network Configuration"
-      Parameters:
-      - EnvironmentName
-      - VpcCIDR
-      - NatGateway
-      - TransitGateway
-    - Label:
-        default: "Public Network Configuration"
-      Parameters:
-      - PublicSubnet1CIDR
-      - PublicSubnet2CIDR
-    - Label:
-        default: "Private Network Configuration"
-      Parameters:
-      - PrivateSubnet1CIDR
-      - PrivateSubnet2CIDR
-      - PrivateSubnet3CIDR
-      - PrivateSubnet4CIDR
-
 Conditions: 
   CreateNgwResource: !Equals [ !Ref NatGateway, "Yes" ]
-  CreateTgwResource: !Equals [ !Ref TransitGateway, "Yes" ]
-
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -173,7 +139,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ1)
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ3)
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -186,7 +152,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ2)
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ4)
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -218,8 +184,6 @@ Resources:
       AllocationId: !GetAtt NatGateway2EIP.AllocationId
       SubnetId: !Ref PublicSubnet2
 
-##PublicRoutes -->>>
-
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -236,14 +200,6 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  DefaultPublicRoute2:
-    Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 10.0.0.0/8
-      TransitGatewayId: !Ref TransitGateway01
-
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -256,23 +212,21 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet2
 
-##PrivateRoutes -->>>
-
   PrivateRouteTable1:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route 01
+          Value: !Sub ${EnvironmentName} Private Routes (AZ1)
 
-  DefaultPrivateRoute1Tgw:
+  DefaultPrivateRoute1:
     Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
+    Condition: CreateNgwResource
     Properties:
       RouteTableId: !Ref PrivateRouteTable1
-      DestinationCidrBlock: 10.0.0.0/8
-      TransitGatewayId: !Ref TransitGateway01
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
 
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -280,10 +234,26 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet1
 
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes (AZ2)
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Condition: CreateNgwResource
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PrivateRouteTable1
+      RouteTableId: !Ref PrivateRouteTable2
       SubnetId: !Ref PrivateSubnet2
 
   PrivateRouteTable3:
@@ -292,19 +262,11 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route TGW (AZ1)
+          Value: !Sub ${EnvironmentName} Private Routes (AZ3)
 
   DefaultPrivateRoute3:
     Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable3
-      DestinationCidrBlock: 10.0.0.0/8
-      TransitGatewayId: !Ref TransitGateway01
-
-  DefaultPrivateRoute3Nat:
-    Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
+    Condition: CreateNgwResource
     Properties:
       RouteTableId: !Ref PrivateRouteTable3
       DestinationCidrBlock: 0.0.0.0/0
@@ -322,19 +284,11 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route TGW (AZ2)
+          Value: !Sub ${EnvironmentName} Private Routes (AZ4)
 
   DefaultPrivateRoute4:
     Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable4
-      DestinationCidrBlock: 10.0.0.0/8
-      TransitGatewayId: !Ref TransitGateway01
-
-  DefaultPrivateRoute4Nat:
-    Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
+    Condition: CreateNgwResource
     Properties:
       RouteTableId: !Ref PrivateRouteTable4
       DestinationCidrBlock: 0.0.0.0/0
@@ -346,77 +300,67 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable4
       SubnetId: !Ref PrivateSubnet4
 
-  TransitGateway01:
-    Type: AWS::EC2::TransitGateway
-    Condition: CreateTgwResource
+  IngressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      AmazonSideAsn: 65000
-      Description: "TGW EBT Transit"
-      AutoAcceptSharedAttachments: enable
-      DefaultRouteTableAssociation: disable
-      DnsSupport: enable
-      VpnEcmpSupport: enable
-      Tags:
-      - Key: Name
-        Value: !Sub "${EnvironmentName}-TGW01"
-      - Key: Application
-        Value: !Ref 'AWS::StackId'
-
-  TGWAttachment:
-    Type: AWS::EC2::TransitGatewayAttachment
-    DependsOn: TransitGateway01
-    Condition: CreateTgwResource
-    Properties:
-      SubnetIds:
-        - !Ref PrivateSubnet3
-        - !Ref PrivateSubnet4
-      TransitGatewayId: !Ref TransitGateway01
+      GroupDescription: "VPC Endpoint Ports Required"
       VpcId: !Ref VPC
-      Tags:
-      - Key: Name
-        Value: !Sub "${EnvironmentName}-Attach"
-
-  TGWFirewallRouteTable:
-    Type: AWS::EC2::TransitGatewayRouteTable
-    DependsOn: TGWAttachment
-    Condition: CreateTgwResource
+      GroupName: "My SG Group VPC"
+      SecurityGroupIngress:
+        - FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      
+  CreateVpcEndpointSSM:
+    Type: AWS::EC2::VPCEndpoint
     Properties:
-      TransitGatewayId: !Ref TransitGateway01
-      Tags:
-      - Key: Name
-        Value: !Sub "Firewall Route Table"
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet4
+      SecurityGroupIds:
+        - !Ref IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      VpcId: !Ref VPC
 
-  TGWFirewallRouteToEgress:
-    Type: AWS::EC2::TransitGatewayRoute
-    DependsOn: TGWAttachment
-    Condition: CreateTgwResource
+  CreateVpcEndpointSSMMessages:
+    Type: AWS::EC2::VPCEndpoint
     Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      TransitGatewayAttachmentId: !Ref TGWAttachment
-      TransitGatewayRouteTableId: !Ref TGWFirewallRouteTable
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet4
+      SecurityGroupIds:
+        - !Ref IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssmmessages
+      VpcId: !Ref VPC
 
-  # myTGWNetworkResourceShare:
-  #   Type: "AWS::RAM::ResourceShare"
-  #   Condition: CreateTgwResource
-  #   DependsOn: TransitGateway01
-  #   Properties:
-  #     Name: "My TGW Share"
-  #     ResourceArns:
-  #       - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:transit-gateway/${TransitGateway01}"
-  #     Principals:
-  #       - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-qxc6rqzu"
-  #       - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-pil1tqhm"
-  #       - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-r0i11jw3"
-  #     Tags:
-  #       - Key: "Name"
-  #         Value: "CentralTGWSharing"
+  CreateVpcEndpointEC2Messages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet4
+      SecurityGroupIds:
+        - !Ref IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
+      VpcId: !Ref VPC
 
 Outputs:
   MyVPC:
     Description: A reference to the created VPC
     Value: !Ref VPC
     Export:
-      Name: EgressVpcId
+      Name: MyVPCId
 
   PublicSubnets:
     Description: A list of the public subnets
@@ -424,46 +368,46 @@ Outputs:
 
   PrivateSubnets:
     Description: A list of the private subnets
-    Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+    Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2, !Ref PrivateSubnet3, !Ref PrivateSubnet4 ]]
 
   PublicSubnet1:
     Description: A reference to the public subnet in the 1st Availability Zone
     Value: !Ref PublicSubnet1
     Export:
-      Name: EgressExPublicSubnet1
+      Name: ExPublicSubnet1
 
   PublicSubnet2:
     Description: A reference to the public subnet in the 2nd Availability Zone
     Value: !Ref PublicSubnet2
     Export:
-      Name: EgressExPublicSubnet2
+      Name: ExPublicSubnet2
 
   PrivateSubnet1:
     Description: A reference to the private subnet in the 1st Availability Zone
     Value: !Ref PrivateSubnet1
     Export:
-      Name: EgressExPrivateSubnet1
+      Name: ExPrivateSubnet1
 
   PrivateSubnet2:
     Description: A reference to the private subnet in the 2nd Availability Zone
     Value: !Ref PrivateSubnet2
     Export:
-      Name: EgressExPrivateSubnet2
+      Name: ExPrivateSubnet2
 
-  myTransitGateway:
-    Description: "My TransitGatewaId"
-    Value: !Ref TransitGateway01
+  PrivateSubnet3:
+    Description: A reference to the private subnet in the 3th Availability Zone
+    Value: !Ref PrivateSubnet3
     Export:
-      Name: TransitGatewayExport
+      Name: ExPrivateSubnet3
 
-  myTransitGatewayAttachment:
-    Description: "My Egress TGW Attachment"
-    Value: !Ref TGWAttachment
+  PrivateSubnet4:
+    Description: A reference to the private subnet in the 4th Availability Zone
+    Value: !Ref PrivateSubnet4
     Export:
-      Name: EgressTGWAttachmentId
+      Name: ExPrivateSubnet4
 
-  myFirewallRouteTable:
-    Description: "My Firewall Route Table"
-    Value: !Ref TGWFirewallRouteTable
+  IngressSecurityGroup:
+    Description: Security group with no ingress rule
+    Value: !Ref IngressSecurityGroup
     Export:
-      Name: FwRouteTable
+      Name: ExIngressSecurityGroup

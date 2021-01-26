@@ -83,6 +83,8 @@ Metadata:
       Parameters:
       - PrivateSubnet1CIDR
       - PrivateSubnet2CIDR
+      - PrivateSubnet3CIDR
+      - PrivateSubnet4CIDR
 
 Conditions: 
   CreateNgwResource: !Equals [ !Ref NatGateway, "Yes" ]
@@ -216,6 +218,8 @@ Resources:
       AllocationId: !GetAtt NatGateway2EIP.AllocationId
       SubnetId: !Ref PublicSubnet2
 
+##PublicRoutes -->>>
+
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -260,15 +264,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route 01 (AZ1)
-
-  DefaultPrivateRoute1:
-    Type: AWS::EC2::Route
-    Condition: CreateNgwResource
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable1
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway1
+          Value: !Sub ${EnvironmentName} Private Route 01
 
   DefaultPrivateRoute1Tgw:
     Type: AWS::EC2::Route
@@ -284,34 +280,10 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet1
 
-  PrivateRouteTable2:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route 02 (AZ2)
-
-  DefaultPrivateRoute2:
-    Type: AWS::EC2::Route
-    Condition: CreateNgwResource
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway2
-
-  DefaultPrivateRoute2Tgw:
-    Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      DestinationCidrBlock: 10.0.0.0/8
-      TransitGatewayId: !Ref TransitGateway01
-
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PrivateRouteTable2
+      RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet2
 
   PrivateRouteTable3:
@@ -366,7 +338,7 @@ Resources:
     Properties:
       RouteTableId: !Ref PrivateRouteTable4
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway1
+      NatGatewayId: !Ref NatGateway2
 
   PrivateSubnet4RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -397,6 +369,7 @@ Resources:
     Properties:
       SubnetIds:
         - !Ref PrivateSubnet3
+        - !Ref PrivateSubnet4
       TransitGatewayId: !Ref TransitGateway01
       VpcId: !Ref VPC
       Tags:
@@ -422,21 +395,22 @@ Resources:
       TransitGatewayAttachmentId: !Ref TGWAttachment
       TransitGatewayRouteTableId: !Ref TGWFirewallRouteTable
 
-  myTGWNetworkResourceShare:
-    Type: "AWS::RAM::ResourceShare"
-    Condition: CreateTgwResource
-    DependsOn: TransitGateway01
-    Properties:
-      Name: "My TGW Share"
-      ResourceArns:
-        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:transit-gateway/${TransitGateway01}"
-      Principals:
-        - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-qxc6rqzu"
-        - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-pil1tqhm"
-        - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-r0i11jw3"
-      Tags:
-        - Key: "Name"
-          Value: "CentralTGWSharing"
+  # myTGWNetworkResourceShare:
+  #   Type: "AWS::RAM::ResourceShare"
+  #   Condition: CreateTgwResource
+  #   DependsOn: TransitGateway01
+  #   Properties:
+  #     Name: "My TGW Share"
+  #     ResourceArns:
+  #       - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:transit-gateway/${TransitGateway01}"
+  #     Principals:
+  #       - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-qxc6rqzu"
+  #       - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-pil1tqhm"
+  #       - "arn:aws:organizations::369931610880:ou/o-ohdgrwt3vj/ou-ogan-r0i11jw3"
+  #     Tags:
+  #       - Key: "Name"
+  #         Value: "CentralTGWSharing"
+
 Outputs:
   MyVPC:
     Description: A reference to the created VPC

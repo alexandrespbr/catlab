@@ -10,27 +10,27 @@ Parameters:
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
-    Default: 100.64.0.0/16
+    Default: 100.64.0.0/24
 
   PrivateSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 100.64.1.0/24
+    Default: 100.64.0.0/28
 
   PrivateSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 100.64.2.0/24
+    Default: 100.64.0.16/28
 
   PrivateSubnet3CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 100.64.3.0/28
+    Default: 100.64.0.224/28
 
   PrivateSubnet4CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 100.64.4.0/28
+    Default: 100.64.0.240/28
 
 Resources:
   VPC:
@@ -105,7 +105,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route 01 (AZ1)
+          Value: !Sub ${EnvironmentName} Private Routes 01
 
   DefaultPrivateRoute1:
     Type: AWS::EC2::Route
@@ -121,27 +121,33 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet1
 
-  PrivateRouteTable2:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route 02 (AZ2)
-
-  DefaultPrivateRoute2:
-    Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      DestinationCidrBlock: 0.0.0.0/0
-      TransitGatewayId: !ImportValue TransitGatewayExport
-
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PrivateRouteTable2
+      RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet2
+
+  # PrivateRouteTable2:
+  #   Type: AWS::EC2::RouteTable
+  #   Properties:
+  #     VpcId: !Ref VPC
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub ${EnvironmentName} Private Route 02 - Standby (AZ2)
+
+  # DefaultPrivateRoute2:
+  #   Type: AWS::EC2::Route
+  #   DependsOn: TGWAttachment
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable2
+  #     DestinationCidrBlock: 0.0.0.0/0
+  #     TransitGatewayId: !ImportValue TransitGatewayExport
+
+  # PrivateSubnet2RouteTableAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable2
+  #     SubnetId: !Ref PrivateSubnet2
 
   PrivateRouteTable3:
     Type: AWS::EC2::RouteTable
@@ -157,6 +163,12 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable3
       SubnetId: !Ref PrivateSubnet3
 
+  PrivateSubnet4RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      SubnetId: !Ref PrivateSubnet4
+
   DefaultPrivateRoute3:
     Type: AWS::EC2::Route
     DependsOn: NetworkFirewall
@@ -171,13 +183,13 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route TGW (AZ2)
+          Value: !Sub ${EnvironmentName} Private Route TGW - Standby (AZ2)
 
-  PrivateSubnet4RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable4
-      SubnetId: !Ref PrivateSubnet4
+  # PrivateSubnet4RouteTableAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable4
+  #     SubnetId: !Ref PrivateSubnet4
 
   DefaultPrivateRoute4:
     Type: AWS::EC2::Route
@@ -186,12 +198,6 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable4
       DestinationCidrBlock: 0.0.0.0/0
       VpcEndpointId: !GetAtt 'Lambdatrigger.VpceId02'
-
-  PrivateSubnet4RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable4
-      SubnetId: !Ref PrivateSubnet4
 
   NetworkFirewall:
     Type: 'AWS::NetworkFirewall::Firewall'
@@ -387,3 +393,15 @@ Outputs:
     Value: !Ref TGWAttachment
     Export:
       Name: InspectionTGWAttachmentId
+
+  myNFWEndpointAZ1:
+    Description: "My NetworkFirewall VPCe AZ1"
+    Value: !GetAtt 'Lambdatrigger.VpceId01'
+    Export:
+      Name: NfwVPCeAz1
+
+  myNFWEndpointAZ2:
+    Description: "My NetworkFirewall VPCe AZ2"
+    Value: !GetAtt 'Lambdatrigger.VpceId02'
+    Export:
+      Name: NfwVPCeAz2
