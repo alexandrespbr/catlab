@@ -1,14 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description:  This template deploys a VPC, with a pair of public and private subnets spread
-  across two Availability Zones. It deploys an internet gateway, with a default
-  route on the public subnets. It deploys a pair of NAT gateways (one in each AZ),
-  and default routes for them in the private subnets.
+Description:  This template deploys a VPC with RAM to new AWS Accounts.
 
 Parameters:
   EnvironmentName:
     Description: An environment name that is prefixed to resource names
     Type: String
-    Default: Spoke
+    Default: Desenv
 
   AWSAccountId:
     Description: Please enter the AWS Account ID to share this Network (REQUIRED)
@@ -79,7 +76,6 @@ Metadata:
       - AWSAccountId
       - EnvironmentName
       - VpcCIDR
-      - PublicNetwork
     - Label:
         default: "Public Network Configuration"
       Parameters:
@@ -137,6 +133,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+        - Key: IsUsedForDeploy
+          Value: "True"
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -149,6 +147,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+        - Key: IsUsedForDeploy
+          Value: "True"
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
@@ -213,7 +213,7 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ1)
         - Key: IsUsedForDeploy
-          Value: "True"
+          Value: "False"
 
   PrivateSubnet6:
     Type: AWS::EC2::Subnet
@@ -226,7 +226,7 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ2)
         - Key: IsUsedForDeploy
-          Value: "True"
+          Value: "False"
 
 ##PublicRoutes -->>>
 
@@ -499,7 +499,7 @@ Outputs:
     Description: A reference to the created VPC
     Value: !Ref VPC
     Export:
-      Name: !Sub "${EnvironmentName}-VPCID" 
+      Name: !Sub "${EnvironmentName}-VPCID"
 
   mySpoketoInspectionRouteTable:
     Description: My Inspection Route Table"

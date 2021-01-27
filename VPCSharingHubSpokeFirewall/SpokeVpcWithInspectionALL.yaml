@@ -19,47 +19,47 @@ Parameters:
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
-    Default: 10.192.2.0/23
+    Default: 10.193.0.0/23
 
   PublicSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
     Type: String
-    Default: 10.192.2.0/26
+    Default: 10.193.0.0/26
 
   PublicSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
     Type: String
-    Default: 10.192.2.64/26
+    Default: 10.193.0.64/26
 
   PrivateSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.192.2.128/26
+    Default: 10.193.0.128/26
 
   PrivateSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.192.2.192/26
+    Default: 10.193.0.192/26
 
   PrivateSubnet3CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.192.3.0/26
+    Default: 10.193.1.0/26
 
   PrivateSubnet4CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.192.3.64/26
+    Default: 10.193.1.64/26
 
   PrivateSubnet5CIDR:
     Description: Please enter the IP range (CIDR notation) for the TGW Attachment in the first Availability Zone
     Type: String
-    Default: 10.192.3.224/28
+    Default: 10.193.1.224/28
 
   PrivateSubnet6CIDR:
     Description: Please enter the IP range (CIDR notation) for the TGW Attachment in the second Availability Zone
     Type: String
-    Default: 10.192.3.240/28
+    Default: 10.193.1.240/28
 
   PublicNetwork: 
     Description: Create Public Network for Account (Yes or No)?.
@@ -332,22 +332,6 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable5
       SubnetId: !Ref PrivateSubnet6
 
-  ##InsertRouteAttachment (Disable IntraVPC NFW Inspection) -->>>
-
-  DefaultRouteToPrivateCIDR1:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !ImportValue InspectionPrivateRouteTable01
-      DestinationCidrBlock: !Ref VpcCIDR
-      TransitGatewayId: !ImportValue TransitGatewayExport
-
-  DefaultRouteToPrivateCIDR2:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !ImportValue InspectionPrivateRouteTable02
-      DestinationCidrBlock: !Ref VpcCIDR
-      TransitGatewayId: !ImportValue TransitGatewayExport
-
   IngressSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -468,7 +452,7 @@ Resources:
     Condition: CreatePublicNetResource
     DependsOn: TGWAttachment
     Properties:
-      Name: !Sub "${EnvironmentName} Public Subnet Share"
+      Name: !Sub "My ${EnvironmentName} Public Subnet Share"
       ResourceArns:
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet1}"
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet2}"
@@ -482,7 +466,7 @@ Resources:
     Type: "AWS::RAM::ResourceShare"
     DependsOn: TGWAttachment
     Properties:
-      Name: !Sub "${EnvironmentName} Private Subnet Share"
+      Name: !Sub "My ${EnvironmentName} Private Subnet Share"
       ResourceArns:
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet1}"
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet2}"

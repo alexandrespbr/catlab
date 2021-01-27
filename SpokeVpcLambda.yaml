@@ -1,14 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description:  This template deploys a VPC, with a pair of public and private subnets spread
-  across two Availability Zones. It deploys an internet gateway, with a default
-  route on the public subnets. It deploys a pair of NAT gateways (one in each AZ),
-  and default routes for them in the private subnets.
+Description:  This template deploys a VPC with RAM to new AWS Accounts.
 
 Parameters:
   EnvironmentName:
     Description: An environment name that is prefixed to resource names
     Type: String
-    Default: Spoke
+    Default: Monitoring
 
   AWSAccountId:
     Description: Please enter the AWS Account ID to share this Network (REQUIRED)
@@ -79,7 +76,6 @@ Metadata:
       - AWSAccountId
       - EnvironmentName
       - VpcCIDR
-      - PublicNetwork
     - Label:
         default: "Public Network Configuration"
       Parameters:
@@ -137,6 +133,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+        - Key: IsUsedForDeploy
+          Value: "True"
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -149,6 +147,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+        - Key: IsUsedForDeploy
+          Value: "True"
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
@@ -213,7 +213,7 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ1)
         - Key: IsUsedForDeploy
-          Value: "True"
+          Value: "False"
 
   PrivateSubnet6:
     Type: AWS::EC2::Subnet
@@ -226,7 +226,7 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ2)
         - Key: IsUsedForDeploy
-          Value: "True"
+          Value: "False"
 
 ##PublicRoutes -->>>
 
@@ -480,7 +480,7 @@ Resources:
 
   myPrivateMonitoringNetworkResourceShare:
     Type: "AWS::RAM::ResourceShare"
-    DependsOn: TGWAttachment
+    DependsOn: myPublicNetworkResourceShare
     Properties:
       Name: !Sub "${EnvironmentName} Private Subnet Share"
       ResourceArns:
@@ -494,12 +494,67 @@ Resources:
         - Key: "Name"
           Value: !Sub "Central ${EnvironmentName} PrivateSubnetSharing"
 
+  NameSubnetIds:
+      Type: AWS::Lambda::Function
+      DependsOn: myPrivateMonitoringNetworkResourceShare
+      Properties:
+        Code: index.zip
+        FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EnvironmentName}-SubnetNameApply'
+        Environment:
+          Variables:
+            VPCID: !Ref VPC
+            ACCOUNTID: !Ref AWSAccountId
+        Handler: "index.lambda_handler"
+        Timeout: 30
+        Role: !GetAtt 'LambdaRole.Arn'
+        Runtime: python3.7
+  Lambdatrigger:
+     Type: 'Custom::NameSubIds'
+     DependsOn: myPrivateMonitoringNetworkResourceShare
+     Properties:
+       ServiceToken: !GetAtt 'NameSubnetIds.Arn'
+       GETNAMES1: !Ref NameSubnetIds
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: "lambda-logs"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:Describe*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWSAccountId}:role/AWSControlTowerExecution"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - "arn:aws:logs:*:*:*"
 Outputs:
   MyVPC:
     Description: A reference to the created VPC
     Value: !Ref VPC
     Export:
-      Name: !Sub "${EnvironmentName}-VPCID" 
+      Name: !Sub "${EnvironmentName}-VPCID"
 
   mySpoketoInspectionRouteTable:
     Description: My Inspection Route Table"

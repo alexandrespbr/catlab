@@ -1,14 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description:  This template deploys a VPC, with a pair of public and private subnets spread
-  across two Availability Zones. It deploys an internet gateway, with a default
-  route on the public subnets. It deploys a pair of NAT gateways (one in each AZ),
-  and default routes for them in the private subnets.
+Description:  This template deploys a VPC with RAM to new AWS Accounts.
 
 Parameters:
   EnvironmentName:
     Description: An environment name that is prefixed to resource names
     Type: String
-    Default: Spoke
+    Default: Monitoring
 
   AWSAccountId:
     Description: Please enter the AWS Account ID to share this Network (REQUIRED)
@@ -79,10 +76,10 @@ Metadata:
       - AWSAccountId
       - EnvironmentName
       - VpcCIDR
-      - PublicNetwork
     - Label:
         default: "Public Network Configuration"
       Parameters:
+      - PublicNetwork
       - PublicSubnet1CIDR
       - PublicSubnet2CIDR
     - Label:
@@ -137,6 +134,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+        - Key: IsUsedForDeploy
+          Value: "True"
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -149,6 +148,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+        - Key: IsUsedForDeploy
+          Value: "True"
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
@@ -213,7 +214,7 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ1)
         - Key: IsUsedForDeploy
-          Value: "True"
+          Value: "False"
 
   PrivateSubnet6:
     Type: AWS::EC2::Subnet
@@ -226,7 +227,7 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ2)
         - Key: IsUsedForDeploy
-          Value: "True"
+          Value: "False"
 
 ##PublicRoutes -->>>
 
@@ -480,7 +481,7 @@ Resources:
 
   myPrivateMonitoringNetworkResourceShare:
     Type: "AWS::RAM::ResourceShare"
-    DependsOn: TGWAttachment
+    DependsOn: myPublicNetworkResourceShare
     Properties:
       Name: !Sub "${EnvironmentName} Private Subnet Share"
       ResourceArns:
@@ -494,12 +495,183 @@ Resources:
         - Key: "Name"
           Value: !Sub "Central ${EnvironmentName} PrivateSubnetSharing"
 
+  NameSubnetIds:
+      Type: AWS::Lambda::Function
+      DependsOn: myPrivateMonitoringNetworkResourceShare
+      Properties:
+        Code:
+          ZipFile: |
+            import json
+            import boto3
+            import logging
+            import urllib3
+            import os
+            http = urllib3.PoolManager()
+
+            logger = logging.getLogger(__name__)
+            logging.getLogger().setLevel(logging.INFO)
+
+            SUCCESS = "SUCCESS"
+            FAILED = "FAILED"
+
+            client = boto3.client('ec2')
+            vpcid = os.environ['VPCID']
+            accountid = os.environ['ACCOUNTID']
+
+            def lambda_handler(event, context):
+                logger.info('Event: %s' % json.dumps(event))
+                responseData={}
+                try:
+                    if event['RequestType'] == 'Delete':
+                        print("Request Type:",event['RequestType'])
+                        print("Delete Request - Nothing to delete")
+                    elif event['RequestType'] == 'Create' or event['RequestType'] == 'Update':
+                        print("Request Type:",event['RequestType'])
+                        GETNAMES1=event['ResourceProperties']['GETNAMES1']
+                        GetSubNames1=get_ids(GETNAMES1)
+                        
+                        sts_client = boto3.client('sts')
+
+                        response = sts_client.assume_role(
+                            RoleArn='arn:aws:iam::'+accountid+':role/AWSControlTowerExecution',
+                            RoleSessionName='assume_role_session'
+                        )
+                        
+                        remoteresource = boto3.resource('ec2',
+                                aws_access_key_id=response['Credentials']['AccessKeyId'],
+                                aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+                                aws_session_token=response['Credentials']['SessionToken']
+                        )
+
+                        output = GetSubNames1
+                        try:
+                                for addtags in output:
+                                    names = (addtags[0])
+                                    subnetids = (addtags[1])
+                                    subnet = remoteresource.Subnet(subnetids)
+                                    subnet.create_tags(
+                                        Tags=[
+                                            {
+                                                'Key': 'Name',
+                                                'Value': names
+                                            },
+                                        ]
+                                    )
+                        except Exception as ex:
+                            raise
+                        
+                        responseData={'GetSubNames1':GetSubNames1}
+                        print("Sending CFN")
+                    responseStatus = 'SUCCESS'
+                except Exception as e:
+                    print('Failed to process:', e)
+                    responseStatus = 'FAILURE'
+                    responseData = {'Failure': 'Check Logs.'}
+                send(event, context, responseStatus, responseData)
+
+            def get_ids(GETNAMES1):
+
+                response = client.describe_subnets(
+                    Filters=[ {
+                            'Name': 'vpc-id',
+                            'Values': [vpcid]},
+                            {
+                            'Name': 'tag:IsUsedForDeploy',
+                            'Values': ['True']}
+                    ]
+                )
+
+                tags = []
+                for tag in response['Subnets']:
+                    for value in tag['Tags']:
+                        if value['Key'] == 'Name':
+                            tags.append(value['Value'])
+
+                subnets = []
+                for subnetids in response['Subnets']:
+                    subnets.append(subnetids['SubnetId'])
+
+                output=[(tags[i],subnets[i]) for i in range(0,len(tags))]
+                
+                return output
+                
+            def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
+                responseUrl = event['ResponseURL']
+                print(responseUrl)
+                responseBody = {'Status': responseStatus,
+                                'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
+                                'PhysicalResourceId': physicalResourceId or context.log_stream_name,
+                                'StackId': event['StackId'],
+                                'RequestId': event['RequestId'],
+                                'LogicalResourceId': event['LogicalResourceId'],
+                                'Data': responseData}
+                json_responseBody = json.dumps(responseBody)
+                print("Response body:\n" + json_responseBody)
+                headers = {
+                    'content-type' : '',
+                    'content-length' : str(len(json_responseBody))
+                }
+                try:
+                    response = http.request('PUT', responseUrl, headers=headers, body=json_responseBody)
+                    print("Status code:", response.status)
+                except Exception as e:
+                    print("send(..) failed executing http.request(..):", e)
+        FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EnvironmentName}-SubnetNameApply'
+        Environment:
+          Variables:
+            VPCID: !Ref VPC
+            ACCOUNTID: !Ref AWSAccountId
+        Handler: "index.lambda_handler"
+        Timeout: 30
+        Role: !GetAtt 'LambdaRole.Arn'
+        Runtime: python3.7
+  Lambdatrigger:
+     Type: 'Custom::NameSubIds'
+     DependsOn: myPrivateMonitoringNetworkResourceShare
+     Properties:
+       ServiceToken: !GetAtt 'NameSubnetIds.Arn'
+       GETNAMES1: !Ref NameSubnetIds
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: "lambda-logs"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:Describe*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWSAccountId}:role/AWSControlTowerExecution"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - "arn:aws:logs:*:*:*"
 Outputs:
   MyVPC:
     Description: A reference to the created VPC
     Value: !Ref VPC
     Export:
-      Name: !Sub "${EnvironmentName}-VPCID" 
+      Name: !Sub "${EnvironmentName}-VPCID"
 
   mySpoketoInspectionRouteTable:
     Description: My Inspection Route Table"

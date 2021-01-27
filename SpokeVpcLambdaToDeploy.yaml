@@ -1,0 +1,641 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template deploys a VPC with RAM to new AWS Accounts.
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: Monitoring
+  AWSAccountId:
+    Description: Please enter the AWS Account ID to share this Network (REQUIRED)
+    Type: String
+    Default: 603478755266
+    AllowedPattern: .+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.192.2.0/23
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in
+      the first Availability Zone
+    Type: String
+    Default: 10.192.2.0/26
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in
+      the second Availability Zone
+    Type: String
+    Default: 10.192.2.64/26
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet
+      in the first Availability Zone
+    Type: String
+    Default: 10.192.2.128/26
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet
+      in the second Availability Zone
+    Type: String
+    Default: 10.192.2.192/26
+  PrivateSubnet3CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet
+      in the first Availability Zone
+    Type: String
+    Default: 10.192.3.0/26
+  PrivateSubnet4CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet
+      in the second Availability Zone
+    Type: String
+    Default: 10.192.3.64/26
+  PrivateSubnet5CIDR:
+    Description: Please enter the IP range (CIDR notation) for the TGW Attachment
+      in the first Availability Zone
+    Type: String
+    Default: 10.192.3.224/28
+  PrivateSubnet6CIDR:
+    Description: Please enter the IP range (CIDR notation) for the TGW Attachment
+      in the second Availability Zone
+    Type: String
+    Default: 10.192.3.240/28
+  PublicNetwork:
+    Description: Create Public Network for Account (Yes or No)?.
+    Default: 'Yes'
+    Type: String
+    AllowedValues:
+    - 'Yes'
+    - 'No'
+    ConstraintDescription: must specify Yes or No.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Network Configuration
+      Parameters:
+      - AWSAccountId
+      - EnvironmentName
+      - VpcCIDR
+    - Label:
+        default: Public Network Configuration
+      Parameters:
+      - PublicSubnet1CIDR
+      - PublicSubnet2CIDR
+    - Label:
+        default: Private Network Configuration
+      Parameters:
+      - PrivateSubnet1CIDR
+      - PrivateSubnet2CIDR
+      - PrivateSubnet3CIDR
+      - PrivateSubnet4CIDR
+      - PrivateSubnet5CIDR
+      - PrivateSubnet6CIDR
+Conditions:
+  CreatePublicNetResource:
+    Fn::Equals:
+    - Ref: PublicNetwork
+    - 'Yes'
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock:
+        Ref: VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value:
+          Ref: EnvironmentName
+      - Key: IsUsedForDeploy
+        Value: 'True'
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Condition: CreatePublicNetResource
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Ref: EnvironmentName
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: CreatePublicNetResource
+    Properties:
+      InternetGatewayId:
+        Ref: InternetGateway
+      VpcId:
+        Ref: VPC
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Condition: CreatePublicNetResource
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Public Subnet (AZ1)
+      - Key: IsUsedForDeploy
+        Value: 'True'
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Condition: CreatePublicNetResource
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Public Subnet (AZ2)
+      - Key: IsUsedForDeploy
+        Value: 'True'
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Private Subnet (AZ1)
+      - Key: IsUsedForDeploy
+        Value: 'True'
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Private Subnet (AZ2)
+      - Key: IsUsedForDeploy
+        Value: 'True'
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: PrivateSubnet3CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Private Subnet (AZ1)
+      - Key: IsUsedForDeploy
+        Value: 'True'
+  PrivateSubnet4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: PrivateSubnet4CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Private Subnet (AZ2)
+      - Key: IsUsedForDeploy
+        Value: 'True'
+  PrivateSubnet5:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: PrivateSubnet5CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} TGW Private Subnet (AZ1)
+      - Key: IsUsedForDeploy
+        Value: 'False'
+  PrivateSubnet6:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: PrivateSubnet6CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} TGW Private Subnet (AZ2)
+      - Key: IsUsedForDeploy
+        Value: 'False'
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Condition: CreatePublicNetResource
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Public Routes
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    Condition: CreatePublicNetResource
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreatePublicNetResource
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet1
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreatePublicNetResource
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet2
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Private Route 01
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayId:
+        Fn::ImportValue: TransitGatewayExport
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1
+      SubnetId:
+        Ref: PrivateSubnet1
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1
+      SubnetId:
+        Ref: PrivateSubnet2
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1
+      SubnetId:
+        Ref: PrivateSubnet3
+  PrivateSubnet4RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1
+      SubnetId:
+        Ref: PrivateSubnet4
+  PrivateRouteTable5:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Private Route TGW 01
+  DefaultPrivateRoute5:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable5
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayId:
+        Fn::ImportValue: TransitGatewayExport
+  PrivateSubnet5RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable5
+      SubnetId:
+        Ref: PrivateSubnet5
+  PrivateSubnet6RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable5
+      SubnetId:
+        Ref: PrivateSubnet6
+  DefaultRouteToPrivateCIDR1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Fn::ImportValue: InspectionPrivateRouteTable01
+      DestinationCidrBlock:
+        Ref: VpcCIDR
+      TransitGatewayId:
+        Fn::ImportValue: TransitGatewayExport
+  DefaultRouteToPrivateCIDR2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Fn::ImportValue: InspectionPrivateRouteTable02
+      DestinationCidrBlock:
+        Ref: VpcCIDR
+      TransitGatewayId:
+        Fn::ImportValue: TransitGatewayExport
+  IngressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VPC Endpoint Ports Required
+      VpcId:
+        Ref: VPC
+      GroupName: My SG Group VPC
+      SecurityGroupIngress:
+      - FromPort: 443
+        IpProtocol: tcp
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+      - FromPort: 80
+        IpProtocol: tcp
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+  CreateVpcEndpointSSM:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds:
+      - Ref: PrivateSubnet1
+      - Ref: PrivateSubnet2
+      SecurityGroupIds:
+      - Ref: IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName:
+        Fn::Sub: com.amazonaws.${AWS::Region}.ssm
+      VpcId:
+        Ref: VPC
+  CreateVpcEndpointSSMMessages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds:
+      - Ref: PrivateSubnet1
+      - Ref: PrivateSubnet2
+      SecurityGroupIds:
+      - Ref: IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName:
+        Fn::Sub: com.amazonaws.${AWS::Region}.ssmmessages
+      VpcId:
+        Ref: VPC
+  CreateVpcEndpointEC2Messages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds:
+      - Ref: PrivateSubnet1
+      - Ref: PrivateSubnet2
+      SecurityGroupIds:
+      - Ref: IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName:
+        Fn::Sub: com.amazonaws.${AWS::Region}.ec2messages
+      VpcId:
+        Ref: VPC
+  TGWAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds:
+      - Ref: PrivateSubnet5
+      - Ref: PrivateSubnet6
+      TransitGatewayId:
+        Fn::ImportValue: TransitGatewayExport
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName}-Attach
+  TGWInspectionRouteTable:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    DependsOn: TGWAttachment
+    Properties:
+      TransitGatewayId:
+        Fn::ImportValue: TransitGatewayExport
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${EnvironmentName} Inspection Route Table
+  TGWFirewallRouteToInspection:
+    Type: AWS::EC2::TransitGatewayRoute
+    DependsOn: TGWAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayAttachmentId:
+        Fn::ImportValue: InspectionTGWAttachmentId
+      TransitGatewayRouteTableId:
+        Ref: TGWInspectionRouteTable
+  TGWFirewallRouteToSpoke:
+    Type: AWS::EC2::TransitGatewayRoute
+    DependsOn: TGWAttachment
+    Properties:
+      DestinationCidrBlock:
+        Ref: VpcCIDR
+      TransitGatewayAttachmentId:
+        Ref: TGWAttachment
+      TransitGatewayRouteTableId:
+        Fn::ImportValue: FwRouteTable
+  TGWSubnetAttachmentFirewallRouteTable1:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    DeletionPolicy: Retain
+    DependsOn: TGWAttachment
+    Properties:
+      TransitGatewayAttachmentId:
+        Fn::ImportValue: InspectionTGWAttachmentId
+      TransitGatewayRouteTableId:
+        Fn::ImportValue: FwRouteTable
+  TGWSubnetAttachmentFirewallRouteTable2:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    DeletionPolicy: Retain
+    DependsOn: TGWAttachment
+    Properties:
+      TransitGatewayAttachmentId:
+        Fn::ImportValue: EgressTGWAttachmentId
+      TransitGatewayRouteTableId:
+        Fn::ImportValue: FwRouteTable
+  TGWSubnetAttachmentFirewallRouteTable3:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    DependsOn: TGWAttachment
+    Properties:
+      TransitGatewayAttachmentId:
+        Ref: TGWAttachment
+      TransitGatewayRouteTableId:
+        Ref: TGWInspectionRouteTable
+  myPublicNetworkResourceShare:
+    Type: AWS::RAM::ResourceShare
+    Condition: CreatePublicNetResource
+    DependsOn: TGWAttachment
+    Properties:
+      Name:
+        Fn::Sub: ${EnvironmentName} Public Subnet Share
+      ResourceArns:
+      - Fn::Sub: arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet1}
+      - Fn::Sub: arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet2}
+      Principals:
+      - Ref: AWSAccountId
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: Central ${EnvironmentName} PublicSubnetSharing
+  myPrivateMonitoringNetworkResourceShare:
+    Type: AWS::RAM::ResourceShare
+    DependsOn: myPublicNetworkResourceShare
+    Properties:
+      Name:
+        Fn::Sub: ${EnvironmentName} Private Subnet Share
+      ResourceArns:
+      - Fn::Sub: arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet1}
+      - Fn::Sub: arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet2}
+      - Fn::Sub: arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet3}
+      - Fn::Sub: arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet4}
+      Principals:
+      - Ref: AWSAccountId
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: Central ${EnvironmentName} PrivateSubnetSharing
+  NameSubnetIds:
+    Type: AWS::Lambda::Function
+    DependsOn: myPrivateMonitoringNetworkResourceShare
+    Properties:
+      Code:
+        S3Bucket: cf-templates-1v3w3x7r785u7-us-east-1
+        S3Key: 1d0e07a5a2d8d12fff3f6bcb803c0b6e
+      FunctionName:
+        Fn::Sub: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EnvironmentName}-SubnetNameApply
+      Environment:
+        Variables:
+          VPCID:
+            Ref: VPC
+          ACCOUNTID:
+            Ref: AWSAccountId
+      Handler: index.lambda_handler
+      Timeout: 30
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Runtime: python3.7
+  Lambdatrigger:
+    Type: Custom::NameSubIds
+    DependsOn: myPrivateMonitoringNetworkResourceShare
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+        - NameSubnetIds
+        - Arn
+      GETNAMES1:
+        Ref: NameSubnetIds
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: lambda-logs
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:Describe*
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - sts:AssumeRole
+            Resource:
+            - Fn::Sub: arn:aws:iam::${AWSAccountId}:role/AWSControlTowerExecution
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - arn:aws:logs:*:*:*
+Outputs:
+  MyVPC:
+    Description: A reference to the created VPC
+    Value:
+      Ref: VPC
+    Export:
+      Name:
+        Fn::Sub: ${EnvironmentName}-VPCID
+  mySpoketoInspectionRouteTable:
+    Description: My Inspection Route Table"
+    Value:
+      Ref: TGWInspectionRouteTable
+    Export:
+      Name:
+        Fn::Sub: ${EnvironmentName}-FwInspectionTable
