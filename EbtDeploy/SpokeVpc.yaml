@@ -469,6 +469,7 @@ Resources:
     Condition: CreatePublicNetResource
     DependsOn: TGWAttachment
     Properties:
+      AllowExternalPrincipals: true
       Name: !Sub "${EnvironmentName} Public Subnet Share"
       ResourceArns:
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet1}"
@@ -483,6 +484,7 @@ Resources:
     Type: "AWS::RAM::ResourceShare"
     DependsOn: myPublicNetworkResourceShare
     Properties:
+      AllowExternalPrincipals: true
       Name: !Sub "${EnvironmentName} Private Subnet Share"
       ResourceArns:
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet1}"
@@ -533,7 +535,7 @@ Resources:
                         sts_client = boto3.client('sts')
 
                         response = sts_client.assume_role(
-                            RoleArn='arn:aws:iam::'+accountid+':role/AWSControlTowerExecution',
+                            RoleArn='arn:aws:iam::'+accountid+':role/TransitAccountRole',
                             RoleSessionName='assume_role_session'
                         )
                         

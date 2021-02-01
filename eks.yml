@@ -1,0 +1,80 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+
+  EKSClusterName:
+    Description: 'Please enter the EKS Cluster Name'
+    Type: String  
+
+  VPC:
+    Description: 'Please enter the EKS VPC'
+    Type: AWS::EC2::VPC::Id   
+
+  EKSSubnetId1:
+    Description: 'Please enter the public EKS SubnetId1'
+    Type: AWS::EC2::Subnet::Id
+
+  EKSSubnetId2:
+    Description: 'Please enter the public EKS SubnetId2'
+    Type: AWS::EC2::Subnet::Id
+
+Resources:
+  EKSIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:  
+          - Effect: Allow
+            Principal:
+              Service:
+                - eks.amazonaws.com
+                - ec2.amazonaws.com  
+                - codebuild.amazonaws.com              
+            Action:
+              - 'sts:AssumeRole' 
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy 
+        - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess 
+        - arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilderECRContainerBuilds                 
+
+  ClusterControlPlaneSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Cluster communication with worker nodes
+      VpcId: !Ref VPC
+
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref EKSClusterName
+      RoleArn:
+        "Fn::GetAtt": ["EKSIAMRole", "Arn"]
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+        - !Ref ClusterControlPlaneSecurityGroup
+        SubnetIds:
+        - !Ref EKSSubnetId1
+        - !Ref EKSSubnetId2
+      Version: 1.18
+
+  EKSNodegroup:
+    Type: 'AWS::EKS::Nodegroup'
+    DependsOn: EKSCluster
+    Properties:
+      ClusterName: !Ref EKSClusterName
+      NodeRole: !GetAtt EKSIAMRole.Arn
+      CapacityType: ON_DEMAND
+      ScalingConfig:
+        MinSize: 2
+        DesiredSize: 2
+        MaxSize: 2
+      Subnets:
+        - !Ref EKSSubnetId1
+        - !Ref EKSSubnetId2

@@ -533,7 +533,7 @@ Resources:
                         sts_client = boto3.client('sts')
 
                         response = sts_client.assume_role(
-                            RoleArn='arn:aws:iam::'+accountid+':role/AWSControlTowerExecution',
+                            RoleArn='arn:aws:iam::'+accountid+':role/TransitAccountRole',
                             RoleSessionName='assume_role_session'
                         )
                         
@@ -658,7 +658,7 @@ Resources:
                 Action:
                   - sts:AssumeRole
                 Resource:
-                  - !Sub "arn:aws:iam::${AWSAccountId}:role/AWSControlTowerExecution"
+                  - !Sub "arn:aws:iam::${AWSAccountId}:role/TransitAccountRole"
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
