@@ -1,0 +1,1497 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Release to Production Document for EC2
+
+Parameters:
+  SecretsManagerARN:
+    Type: String
+    Default: 'null'
+  DomainName: 
+    Type: String
+    Default: 'null'
+  DirectoryOU:
+    Type: String
+    Default: 'null'
+  DirectoryDNS1: 
+    Type: String
+    Default: 'null'
+  DirectoryDNS2:
+    Type: String
+    Default: 'null'
+  RoleToGetSecret:
+    Type: String
+    Default: GetSecretEC2Role 
+  ActiveDirectory:
+    Default: false
+    Type: String
+    AllowedValues: [true, false]     
+
+Resources:
+
+  InstanceProfileGetGetSecretEC2Role: 
+    Type: "AWS::IAM::InstanceProfile"
+    Properties: 
+      InstanceProfileName: !Join
+      - '-'
+      - - GetSecretEc2Role
+        - !Select
+          - 0
+          - !Split
+            - '-'
+            - !Select
+              - 2
+              - !Split
+                - /
+                - !Ref 'AWS::StackId'
+      Path: "/"
+      Roles: 
+        - !Ref GetSecretEC2Role               
+
+  GetSecretEC2Role:
+    Type: 'AWS::IAM::Role'
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W28
+            reason: "RP Requirement"
+    Properties:
+      RoleName: !Join
+      - '-'
+      - - GetSecretEc2Role
+        - !Select
+          - 0
+          - !Split
+            - '-'
+            - !Select
+              - 2
+              - !Split
+                - /
+                - !Ref 'AWS::StackId'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - !Ref InstanceProfilePolicy
+
+  InstanceProfilePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W13
+            reason: "RP Requirement"
+    Properties: 
+      Description: 'Customer Managed Policy for  Automation'
+      Path: / 
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - kms:Decrypt
+            Resource: "*"              
+
+
+  CloudWatchLogsManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W13
+            reason: "RP Requirement"
+          - id: W28
+            reason: "RP Requirement"
+    Properties: 
+      Description: 'Customer Managed Policy allowing EC2 to stream data to CloudWatchLogs'
+      ManagedPolicyName: !Join
+      - '-'
+      - - EC2PutLogsCloudWatch
+        - !Select
+          - 0
+          - !Split
+            - '-'
+            - !Select
+              - 2
+              - !Split
+                - /
+                - !Ref 'AWS::StackId'
+      Path: / 
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+              - logs:PutLogEvents
+            Resource: "*"           
+
+
+  EC2DocumentAutomationRole:
+    Type: 'AWS::IAM::Role'
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W28
+            reason: "RP Requirement"
+    Properties:
+      RoleName: !Join
+      - '-'
+      - - EC2ReleaseToProduction
+        - !Select
+          - 0
+          - !Split
+            - '-'
+            - !Select
+              - 2
+              - !Split
+                - /
+                - !Ref 'AWS::StackId'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ssm.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonSSMAutomationRole'
+        - 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSSMDirectoryServiceAccess'
+        - 'arn:aws:iam::aws:policy/IAMReadOnlyAccess'
+        - !Ref AutomationPolicy
+
+  AutomationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F40
+            reason: "RP Requirement"
+          - id: W13
+            reason: "RP Requirement"
+    Properties: 
+      Description: 'Customer Managed Policy for  Automation'
+      Path: / 
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowAutomation 
+            Effect: Allow
+            Action: 
+              - iam:PutRolePolicy
+              - iam:CreateRole
+              - iam:CreatePolicy
+              - iam:AttachRolePolicy
+              - iam:CreateInstanceProfile
+              - iam:AddRoleToInstanceProfile
+              - iam:PassRole
+              - iam:DeleteInstanceProfile
+              - iam:DetachRolePolicy
+              - iam:DeleteRole
+              - iam:RemoveRoleFromInstanceProfile
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - kms:Decrypt
+            Resource: "*"              
+
+  SSMDocExecutionRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W28
+            reason: "RP Requirement"
+    Properties:
+      RoleName: !Join
+      - '-'
+      - - SSMDocExecutionRole
+        - !Select
+          - 0
+          - !Split
+            - '-'
+            - !Select
+              - 2
+              - !Split
+                - /
+                - !Ref 'AWS::StackId'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - !Ref SSMDocExecutionPolicy
+
+  SSMDocExecutionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F40
+            reason: "RP Requirement"
+          - id: F5
+            reason: "RP Requirement"
+          - id: W13
+            reason: "RP Requirement"
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - ssm:ListDocuments
+              - ssm:ListTagsForResource
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - ssm:CreateDocument
+              - ssm:AddTagsToResource
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - ssm:DeleteDocument
+              - ssm:DescribeDocument
+              - ssm:GetDocument
+              - ssm:ListDocumentVersions
+              - ssm:ModifyDocumentPermission
+              - ssm:UpdateDocument
+              - ssm:UpdateDocumentDefaultVersion
+              - ssm:AddTagsToResource
+              - ssm:RemoveTagsFromResource
+              - ssm:DescribeAutomationStepExecutions
+              - ec2:*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - kms:Decrypt
+            Resource: "*"            
+
+  SSMDocFunction: 
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3, urllib3, json, hashlib
+          from botocore.exceptions import ClientError
+          http = urllib3.PoolManager()
+          SUCCESS = "SUCCESS"
+          FAILED = "FAILED"
+          ssm = boto3.client('ssm')
+          responseData = {}
+          def send(event, context, responseStatus, responseData, physical_resource_id, noEcho=False, reason=None):
+              responseUrl = event['ResponseURL']
+              print(responseUrl)
+              responseBody = {}
+              responseBody['Status'] = responseStatus
+              responseBody['Reason'] = reason or "See the details in CloudWatch Log Stream: {}".format(context.log_stream_name)
+              responseBody['PhysicalResourceId'] = physical_resource_id or context.log_stream_name
+              responseBody['StackId'] = event['StackId']
+              responseBody['RequestId'] = event['RequestId']
+              responseBody['LogicalResourceId'] = event['LogicalResourceId']
+              responseBody['NoEcho'] = noEcho
+              responseBody['Data'] = responseData
+              json_responseBody = json.dumps(responseBody)
+              print("Response body:\n" + json_responseBody)
+              headers = {
+                  'content-type' : '',
+                  'content-length' : str(len(json_responseBody))
+              }
+              try:
+                  response = http.request('PUT',responseUrl,headers=headers,body=json_responseBody)
+                  print("Status code: {}".format(str(response.status)))
+              except Exception as e:
+                  print("send(..) failed executing requests.put(..): " + str(e))
+          def handler(event, context):
+            print(json.dumps(event))
+            s = '%s-%s' % (event.get('StackId'), event.get('LogicalResourceId'))
+            physical_resource_id = hashlib.md5(s.encode('utf-8')).hexdigest()
+            StackName = event['StackId']
+            LogicalResourceId = event['LogicalResourceId']
+            UniqueId = event['RequestId']
+            responseData = {}
+            if event['RequestType'] == 'Create':
+              try: 
+                  ssm.create_document(
+                    Content=json.dumps(event['ResourceProperties']['Content']),
+                    Name=event['ResourceProperties']['Name'],
+                    DocumentFormat='YAML',
+                    DocumentType='Automation'
+                    )
+                  responseStatus = 'SUCCESS'
+                  send(event, context, responseStatus, responseData, physical_resource_id, noEcho=False, reason=None)
+              except ClientError as e:
+                  message = e.response['Error']['Message']
+                  print(message)
+                  responseStatus = 'FAILED'
+                  send(event, context, responseStatus, responseData, physical_resource_id, noEcho=False, reason=None)
+            if event['RequestType'] == 'Delete':
+              try:
+                  ssm.delete_document(
+                      Name=event['ResourceProperties']['Name'],
+                      Force=True
+                  )
+                  responseStatus = 'SUCCESS'
+                  send(event, context, responseStatus, responseData, physical_resource_id, noEcho=False, reason=None)
+              except ClientError as e:
+                  message = e.response['Error']['Message']
+                  print(message)
+                  responseStatus = 'FAILED'
+                  send(event, context, responseStatus, responseData, physical_resource_id, noEcho=False, reason=None)
+            if event['RequestType'] == 'Update':
+              try:
+                  response = ssm.update_document(
+                    Content=json.dumps(event['ResourceProperties']['Content']),
+                    Name=event['ResourceProperties']['Name'],
+                    DocumentFormat='JSON',
+                    DocumentVersion='$LATEST'
+                    )
+                  ssm.update_document_default_version(
+                      Name=event['ResourceProperties']['Name'],
+                      DocumentVersion=response['DocumentDescription']['LatestVersion']
+                  )              
+                  responseStatus = 'SUCCESS'
+                  send(event, context, responseStatus, responseData, physical_resource_id, noEcho=False, reason=None)
+              except ClientError as e:
+                  message = e.response['Error']['Message']
+                  print(message)
+                  responseStatus = 'FAILED'
+                  send(event, context, responseStatus, responseData, physical_resource_id, noEcho=False, reason=None)                  
+      Handler: 'index.handler'
+      MemorySize: 128
+      Role: !GetAtt 'SSMDocExecutionRole.Arn'
+      Runtime: 'python3.7'
+      Timeout: 60
+
+  LambdaLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SSMDocFunction}'
+
+  RPReleaseToProduction:
+    DependsOn:
+      - RPWindowsOnboardDocument
+      - RPLinuxOnboardDocument
+      - RPOnboardDocument
+    Type: Custom::SSMDocument
+    Properties:
+      DocumentType: Automation
+      Name: RPReleaseToProduction
+      ServiceToken: !GetAtt SSMDocFunction.Arn
+      StackName: !Ref AWS::StackName
+      Content:
+        schemaVersion: "0.3"
+        assumeRole: "{{ AutomationAssumeRole }}"
+        description: Automated Release to Production 
+        mainSteps:
+          - name: DescribeInstanceStatus 
+            action: aws:executeAwsApi
+            onFailure: step:End
+            isCritical: false
+            inputs:
+              Service: ec2
+              Api: DescribeInstanceStatus
+              InstanceIds:
+                - "{{InstanceIds}}"
+            outputs:
+              - Name: InstanceStatus
+                Selector: "$.InstanceStatuses[0].InstanceState.Name"
+                Type: String
+          - name: CheckInstanceState
+            action: aws:branch
+            inputs:
+              Choices:
+                - Or:
+                  - Variable: "{{DescribeInstanceStatus.InstanceStatus}}"
+                    StringEquals: running
+                  - Variable: "{{DescribeInstanceStatus.InstanceStatus}}"
+                    StringEquals: pending
+                  NextStep: GetTags
+              Default: 
+                End
+          - name: GetTags
+            action: 'aws:executeScript'
+            inputs:
+              Runtime: python3.6
+              Handler: script_handler
+              Script: |-
+                import json,boto3,string
+                client_ec2 = boto3.client('ec2')
+                result = {}
+                def script_handler(events, context):
+                  response = client_ec2.describe_instances(InstanceIds=[events['ResourceId']])
+                  for tag_value in events['TagValues']:
+                    check_tags(tag_value, response, events)
+                  return result
+                def check_tags(tag_value, response, events):
+                  for i in response['Reservations']:
+                    for x in i['Instances']:
+                      if x.get('Tags'):
+                        for y in x['Tags']:
+                          if y.get('Key') == tag_value and y.get('Value')  == 'yes':
+                            result[tag_value] = 'yes'
+                          elif y.get('Key') == tag_value and y.get('Value')  == 'no':
+                            result[tag_value] = 'no'
+                          elif y.get('key') == tag_value and y.get('Value') != 'no' and y.get('Value') != 'yes':
+                            result[tag_value] = 'yes'
+                        if not result.get(tag_value):
+                          client_ec2.create_tags(Resources=[events['ResourceId']], Tags=[{'Key': tag_value, 'Value': 'yes'}])
+                          result[tag_value] = 'yes'
+                      else:
+                        client_ec2.create_tags(Resources=[events['ResourceId']], Tags=[{'Key': tag_value, 'Value': 'yes'}])
+                        result[tag_value] = 'yes'
+                  return result
+              InputPayload:
+                ResourceId: '{{ InstanceIds }}'
+                TagValues:
+                  - Onboard
+                  - ScanPatch
+                  - ScanInventory
+                  - Backup
+            outputs:
+              - Name: Onboard
+                Selector: $.Payload.Onboard
+                Type: String
+          - name: CheckTags 
+            action: aws:branch
+            inputs:
+              Choices:
+              - NextStep: DescribeInstanceProfile 
+                Variable: "{{GetTags.Onboard}}"
+                Contains: 'yes'
+              - NextStep: End 
+                Variable: "{{GetTags.Onboard}}"
+                Contains: 'no'          
+          - name: DescribeInstanceProfile 
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: DescribeIamInstanceProfileAssociations
+              Filters:
+                - Name: instance-id
+                  Values:
+                  - "{{InstanceIds}}"
+            outputs:
+              - Name: InstanceProfileArn
+                Selector: "$.IamInstanceProfileAssociations[0].IamInstanceProfile.Arn"
+                Type: String
+              - Name: AssociationId
+                Selector: "$.IamInstanceProfileAssociations[0].AssociationId"
+                Type: String
+          - name: CheckInstanceProfileAssociations 
+            action: aws:branch
+            inputs:
+              Choices:
+              - NextStep: CreateEC2role 
+                Not:
+                  Variable: "{{DescribeInstanceProfile.InstanceProfileArn}}"
+                  Contains: 'arn:'
+              - NextStep: GetInstanceProfileArn 
+                Variable: "{{DescribeInstanceProfile.InstanceProfileArn}}"
+                Contains: 'arn:'          
+          - name: CreateEC2role 
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: iam
+              Api: CreateRole
+              AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+              RoleName: "{{ InstanceIds }}-InstanceProfile"
+            outputs:
+              - Name: RoleArn
+                Selector: "$.Role.Arn"
+                Type: String
+              - Name: RoleName
+                Selector: "$.Role.RoleName"
+                Type: String        
+          - name: CreateInstanceProfileForRole  
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: iam
+              Api: CreateInstanceProfile
+              InstanceProfileName: "{{ InstanceIds }}-InstanceProfile"
+              Path: "/"
+          - name: AddRoleToInstanceProfile 
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: iam
+              Api: AddRoleToInstanceProfile
+              InstanceProfileName: "{{ InstanceIds }}-InstanceProfile"
+              RoleName: "{{ CreateEC2role.RoleName }}"
+          - name: GetInstanceProfile 
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: iam
+              Api: GetInstanceProfile
+              InstanceProfileName: "{{ InstanceIds }}-InstanceProfile"
+            outputs:
+              - Name: InstanceProfileArn
+                Selector: "$.InstanceProfile.Arn"
+                Type: String
+              - Name: InstanceProfileName
+                Selector: "$.InstanceProfile.InstanceProfileName"
+                Type: String
+              - Name: RoleName
+                Selector: "$.InstanceProfile.Roles[0].RoleName"
+                Type: String         
+          - name: AttachIAMProfileToInstanceWithRetry 
+            action: aws:executeAwsApi
+            onFailure: Abort
+            maxAttempts: 80 
+            timeoutSeconds: 2
+            inputs:
+              Service: ec2
+              Api: associate_iam_instance_profile
+              InstanceId: "{{InstanceIds}}"
+              IamInstanceProfile:
+                Arn: "{{GetInstanceProfile.InstanceProfileArn}}"
+                Name: "{{GetInstanceProfile.InstanceProfileName}}"
+          - name: GetInstanceProfileArn 
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: DescribeIamInstanceProfileAssociations
+              Filters:
+                - Name: instance-id
+                  Values:
+                  - "{{InstanceIds}}"
+            outputs:
+              - Name: InstanceProfileArn
+                Selector: "$.IamInstanceProfileAssociations[0].IamInstanceProfile.Arn"
+                Type: String
+          - name: GetRoleName 
+            action: 'aws:executeScript'
+            maxAttempts: 5
+            inputs:
+              Runtime: python3.6
+              Handler: script_handler
+              Script: |-
+                import json, boto3, string
+                client_iam = boto3.client('iam')
+                paginator = client_iam.get_paginator('list_instance_profiles')
+                def script_handler(events, context):
+                  print(events)
+                  result = {}
+                  response_iterator = paginator.paginate()
+                  for page in response_iterator:
+                    for x in page['InstanceProfiles']:
+                      if x['Arn'] == events['InstanceProfileArn']:
+                        result['RoleName'] = x['Roles'][0]['RoleName']
+                  return result
+              InputPayload:
+                InstanceProfileArn: "{{GetInstanceProfileArn.InstanceProfileArn}}"
+            outputs:
+              - Name: RoleName
+                Selector: $.Payload.RoleName
+                Type: String
+          - name: AttachManagePolicies 
+            action: 'aws:executeScript'
+            inputs:
+              Runtime: python3.6
+              Handler: script_handler
+              Script: |-
+                import json, boto3, string
+                client_iam = boto3.client('iam')
+                def script_handler(events, context):
+                  print(events)
+                  mandatory_policies = ['AmazonSSMManagedInstanceCore', 'AmazonSSMDirectoryServiceAccess', 'EC2PutLogsCloudWatch']
+                  current_policies = []
+                  diff = []
+                  try:
+                    response = client_iam.list_attached_role_policies(RoleName=events['RoleName'])
+                    for i in response['AttachedPolicies']:
+                      if i['PolicyName'] == 'AmazonSSMManagedInstanceCore' or i['PolicyName'] == 'AmazonSSMDirectoryServiceAccess' or i['PolicyName'] == 'EC2PutLogsCloudWatch':
+                        current_policies.append(i['PolicyName'])
+                  except Exception as e:
+                      print('Error %s' % (e))
+                  diff = (list(set(mandatory_policies) - set(current_policies)))
+                  if len(diff) > 0:
+                    for x in diff:
+                      print('this is x %s' % (x))
+                      policy_arn = f'arn:aws:iam::aws:policy/{x}'
+                      if x == 'EC2PutLogsCloudWatch':
+                        account_id = context['global:ACCOUNT_ID']
+                        policy_arn = f'arn:aws:iam::{account_id}:policy/{x}'
+                        print('this is the policy arn %s' % (policy_arn))
+                      try:
+                        client_iam.attach_role_policy(RoleName=events['RoleName'],PolicyArn=policy_arn)
+                      except Exception as e:
+                          print('Error %s' % (e))
+              InputPayload:
+                RoleName: "{{GetRoleName.RoleName}}"
+          - name: GetInstance
+            action: aws:executeAwsApi
+            inputs:
+              Service: ec2
+              Api: DescribeInstances
+              InstanceIds:
+                - "{{ InstanceIds }}"
+            outputs:
+            - Name: platform
+              Selector: "$.Reservations[0].Instances[0].Platform"
+              Type: String
+          - name: ChooseOS
+            action: aws:branch
+            inputs:
+              Choices:
+              - NextStep: WindowsInstance
+                Variable: "{{GetInstance.platform}}"
+                StringEquals: windows
+              - NextStep: LinuxInstance
+                Not:
+                  Variable: "{{GetInstance.platform}}"
+                  StringEquals: windows
+          - name: WindowsInstance
+            action: aws:executeAutomation
+            nextStep: FinishOnboard
+            timeoutSeconds: 3600
+            onFailure: Abort
+            inputs:
+              DocumentName: RPWindowsInstanceOnboard
+              RuntimeParameters:
+                InstanceIds: "{{ InstanceIds }}"
+                InstanceName: "{{ InstanceName }}"
+                DomainName: "{{ DomainName }}"
+                DirectoryOU: "{{ DirectoryOU }}"
+                DirectoryDNS1: "{{ DirectoryDNS1 }}"
+                DirectoryDNS2: "{{ DirectoryDNS2 }}"
+          - name: LinuxInstance
+            action: aws:executeAutomation
+            nextStep: FinishOnboard
+            timeoutSeconds: 3600
+            onFailure: Abort
+            inputs:
+              DocumentName: RPLinuxInstanceOnboard
+              RuntimeParameters:
+                InstanceIds: "{{ InstanceIds }}"
+                InstanceName: "{{ InstanceName }}"
+                DomainName: "{{ DomainName }}"
+                DirectoryOU: "{{ DirectoryOU }}"                
+                DirectoryDNS1: "{{ DirectoryDNS1 }}"
+                DirectoryDNS2: "{{ DirectoryDNS2}}"
+          - name: FinishOnboard
+            action: aws:executeAutomation
+            timeoutSeconds: 3600
+            onFailure: Abort
+            inputs:
+              DocumentName: RPOnboard
+              RuntimeParameters:
+                InstanceIds: '{{ InstanceIds }}'
+          - name: End
+            action: aws:sleep
+            inputs:
+              Duration: PT1S
+        parameters:
+          AutomationAssumeRole:
+            type: String
+            description: Automation Assume Role Arns
+            default: !GetAtt EC2DocumentAutomationRole.Arn
+          InstanceIds:
+            type: String
+            description: InstanceId
+          InstanceName:
+            type: String
+            description: (Optional) InstanceName
+            default: "null"
+          DomainName: 
+            type: String
+            default: !Ref DomainName
+          DirectoryOU:
+            type: String
+            default: !Ref DirectoryOU      
+          DirectoryDNS1: 
+            type: String
+            default: !Ref DirectoryDNS1
+          DirectoryDNS2:
+            type: String
+            default: !Ref DirectoryDNS2
+          SecretsManagerARN:
+            type: String
+            default: !Ref SecretsManagerARN
+          ActiveDirectory:
+            type: String
+            default: !Ref ActiveDirectory            
+                      
+
+  RPWindowsOnboardDocument:
+    Type: Custom::SSMDocument
+    Properties:
+      Name: RPWindowsInstanceOnboard
+      DocumentType: Automation
+      ServiceToken: !GetAtt SSMDocFunction.Arn
+      StackName: !Ref AWS::StackName
+      Content:
+        schemaVersion: "0.3"
+        assumeRole: "{{ AutomationAssumeRole }}"
+        description: Document to onboard Windows Instances
+        mainSteps:
+          - name: DescribeInstanceProfile 
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: DescribeIamInstanceProfileAssociations
+              Filters:
+                - Name: instance-id
+                  Values:
+                  - "{{InstanceIds}}"
+            outputs:
+              - Name: AssociationId
+                Selector: "$.IamInstanceProfileAssociations[0].AssociationId"
+                Type: String  
+              - Name: InstanceProfileArn
+                Selector: "$.IamInstanceProfileAssociations[0].IamInstanceProfile.Arn"
+                Type: String                                        
+          - name: CheckHostnameWindows
+            action: aws:runCommand
+            onFailure: step:RenameWindows
+            nextStep: SkipActiveDirectory
+            isCritical: false
+            inputs:
+              DocumentName: AWS-RunPowerShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  $hostname = "{{ InstanceName }}"
+                  If ($hostname -eq "null") {
+                    Write-Host "Hostname will be kept, server launched outside Service Catalog"
+                    exit 0 
+                    }                  
+                  Write-Host "Desired hostname $hostname"
+                  $current_hostname = hostname
+                  Write-Host "Current hostname $current_hostname"
+                  If ($hostname -eq $current_hostname) {
+                    Write-Host "$hostname = $current_hostname... nothing to do"
+                    exit 0 }
+                  Else { 
+                    Write-Host "$hostname != $current_hostname... need to rename"
+                    exit 1 }
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true                                                                       
+          - name: RenameWindows
+            action: aws:runCommand
+            inputs:
+              DocumentName: AWS-RunPowerShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  Rename-Computer -NewName '{{ InstanceName }}' -Force
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true    
+          - name: SkipActiveDirectory
+            action: aws:runCommand
+            onFailure: step:CheckDomainJoined
+            nextStep: End
+            inputs: 
+              DocumentName: AWS-RunPowerShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  $adparam = "{{ ActiveDirectory }}"
+                  If ($adparam -eq "true") {
+                    write-host ("Active directory enabled! Joining in the next step.")
+                    exit 1
+                  }Else {
+                    write-host ("Active directory not enabled! Skipping.")
+                    exit 0
+                  }   
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true                                                                  
+          - name: RestartEC2Windows
+            action: aws:executeAwsApi
+            maxAttempts: 3
+            timeoutSeconds: 1200
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: RebootInstances
+              InstanceIds: 
+                - '{{ InstanceIds }}'
+          - name: waitServerRestart
+            action: aws:sleep
+            inputs:
+              Duration: PT2M   
+          - name: CheckDomainJoined
+            action: aws:runCommand
+            onFailure: step:GrantPermissionsToGetSecret
+            nextStep: End
+            isCritical: false
+            inputs:
+              DocumentName: AWS-RunPowerShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  $domainname = "{{ DomainName }}"
+                  $domain = (Get-WmiObject -Class Win32_ComputerSystem).Domain
+                  If ($domain -eq $domainname) { exit 0 }
+                  Else { exit 1 }
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true                                                                     
+          - name: GrantPermissionsToGetSecret
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: ReplaceIamInstanceProfileAssociation
+              AssociationId: '{{DescribeInstanceProfile.AssociationId}}'
+              IamInstanceProfile: 
+                Name: '{{RoleToGetSecret}}'
+            outputs:
+              - Name: AssociationId
+                Selector: "$.IamInstanceProfileAssociation.AssociationId"
+                Type: String                 
+          - name: JoinActiveDirectory
+            action: aws:runCommand
+            onFailure: Continue
+            inputs:
+              DocumentName: AWS-RunPowerShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  $ADAPTER=Get-NetAdapter | where {$_.ifDesc -notlike "TAP*"} | foreach InterfaceAlias | select -First 1
+                  Set-DnsClientServerAddress -InterfaceAlias "$ADAPTER" -ServerAddresses ("{{DirectoryDNS1}}")
+                  $SECRETS_MANAGER = Get-SECSecretValue -SecretId {{SecretsManagerARN}} -versionstage AWSCURRENT
+                  $SECRET = $SECRETS_MANAGER.SecretString | ConvertFrom-Json
+                  $DOMAIN = "{{DomainName}}\"
+                  $USERNAME=$DOMAIN+$SECRET.username
+                  $PASS=$SECRET.password
+                  $PASSWORD = ConvertTo-SecureString -String $PASS -AsPlainText -Force
+                  $CREDENTIAL = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $USERNAME, $PASSWORD
+                  Add-Computer -DomainName '{{DomainName}}' -Credential $CREDENTIAL -Restart
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true                                                                     
+          - name: RevokePermissionsToGetSecret
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: ReplaceIamInstanceProfileAssociation
+              AssociationId: '{{GrantPermissionsToGetSecret.AssociationId}}'
+              IamInstanceProfile: 
+                Arn: '{{DescribeInstanceProfile.InstanceProfileArn}}'
+          - name: End
+            action: aws:sleep
+            inputs:
+              Duration: PT1S                     
+        parameters:
+          AutomationAssumeRole:
+            type: String
+            description: Automation Assume Role Arns
+            default: !GetAtt EC2DocumentAutomationRole.Arn
+          InstanceIds:
+            type: String
+            description: InstanceId
+          InstanceName:
+            type: String
+            description: (Optional) InstanceName
+            default: "null"
+          DomainName: 
+            type: String
+            default: !Ref DomainName
+          DirectoryOU:
+            type: String
+            default: !Ref DirectoryOU      
+          DirectoryDNS1: 
+            type: String
+            default: !Ref DirectoryDNS1
+          DirectoryDNS2:
+            type: String
+            default: !Ref DirectoryDNS2
+          SecretsManagerARN:
+            type: String
+            default: !Ref SecretsManagerARN
+          RoleToGetSecret:
+            type: String
+            default: !Ref RoleToGetSecret
+          ActiveDirectory:
+            type: String
+            default: !Ref ActiveDirectory       
+       
+
+
+  RPLinuxOnboardDocument:
+    Type: Custom::SSM-Document
+    Properties:
+      Name: RPLinuxInstanceOnboard
+      ServiceToken: !GetAtt SSMDocFunction.Arn
+      StackName: !Ref AWS::StackName
+      Content:
+        schemaVersion: "0.3"
+        assumeRole: "{{ AutomationAssumeRole }}"
+        description: Automated Release to Production 
+        mainSteps:
+          - name: DescribeInstanceProfile 
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: DescribeIamInstanceProfileAssociations
+              Filters:
+                - Name: instance-id
+                  Values:
+                  - "{{InstanceIds}}"
+            outputs:
+              - Name: AssociationId
+                Selector: "$.IamInstanceProfileAssociations[0].AssociationId"
+                Type: String  
+              - Name: InstanceProfileArn
+                Selector: "$.IamInstanceProfileAssociations[0].IamInstanceProfile.Arn"
+                Type: String  
+          - name: waitServerRestartLinux
+            action: aws:sleep
+            inputs:
+              Duration: PT2M  
+          - name: InstallBeats
+            action: aws:runCommand
+            onFailure: Abort        
+            nextStep: CheckHostnameLinux
+            isCritical: false
+            inputs:
+              DocumentName: AWS-RunShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  sudo rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch                  
+                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/elastic.repo /etc/yum.repos.d/elastic.repo               
+                  sudo yum install filebeat metricbeat -y
+                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/filebeat-linux.yml /etc/filebeat/filebeat.yml 
+                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/metricbeat-linux.yml  /etc/metricbeat/metricbeat.yml 
+                  sudo systemctl enable metricbeat
+                  sudo systemctl restart metricbeat                             
+                  sudo systemctl enable filebeat
+                  sudo systemctl restart filebeat
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true                                      
+          - name: CheckHostnameLinux
+            action: aws:runCommand
+            onFailure: step:RenameLinux            
+            nextStep: SkipActiveDirectory
+            isCritical: false
+            inputs:
+              DocumentName: AWS-RunShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  HOSTNAME_TOBE="{{ InstanceName }}"
+                  HOSTNAME=`hostname`
+                  if [ ${HOSTNAME_TOBE} == "null" ]; then
+                    echo "nothing to do"
+                    exit 0 
+                  fi
+                  if [ ${HOSTNAME_TOBE} == ${HOSTNAME} ]; then
+                    echo "nothing to do"
+                    exit 0 
+                  else
+                    exit 1
+                  fi
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true 
+          - name: SkipActiveDirectory
+            action: aws:runCommand
+            onFailure: step:GrantPermissionsToGetSecret
+            nextStep: End
+            inputs: 
+              DocumentName: AWS-RunShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  ADPARAM="{{ ActiveDirectory }}"
+                  if [ ${ADPARAM} == "true" ]; then
+                    echo "Active directory enabled! Joining in the next step."
+                    exit 1 
+                  else
+                    echo "Active directory not enabled! Skipping."
+                    exit 0
+                  fi                                  
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true                                                                                       
+          - name: RenameLinux
+            action: aws:runCommand
+            inputs:
+              DocumentName: AWS-RunShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  sudo hostnamectl set-hostname '{{ InstanceName }}' 
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true                                                                     
+          - name: RestartEC2Linux
+            action: aws:executeAwsApi
+            maxAttempts: 3
+            timeoutSeconds: 1200
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: RebootInstances
+              InstanceIds: 
+                - '{{ InstanceIds }}'
+          - name: waitServerRestartLinuxTwo
+            action: aws:sleep
+            inputs:
+              Duration: PT2M
+          - name: GrantPermissionsToGetSecret
+            action: aws:executeAwsApi
+            onFailure: Abort
+            nextStep: CheckDomainJoinedLinux
+            inputs:
+              Service: ec2
+              Api: ReplaceIamInstanceProfileAssociation
+              AssociationId: '{{DescribeInstanceProfile.AssociationId}}'
+              IamInstanceProfile: 
+                Name: '{{RoleToGetSecret}}'
+            outputs:
+              - Name: AssociationId
+                Selector: "$.IamInstanceProfileAssociation.AssociationId"
+                Type: String              
+          - name: CheckDomainJoinedLinux
+            action: aws:runCommand
+            inputs:
+              DocumentName: AWS-RunShellScript
+              InstanceIds:
+                - '{{ InstanceIds }}'
+              Parameters:
+                commands: |-
+                  DNS1="{{ DirectoryDNS1 }}"
+                  DNS2="{{ DirectoryDNS2 }}"
+                  DOMAIN="{{ DomainName }}"
+                  sudo yum -y install sssd realmd krb5-workstation samba-common-tools jq
+                  export AWS_DEFAULT_REGION=$(curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
+                  echo $AWS_DEFAULT_REGION
+                  SECRETS_MANAGER=$(aws secretsmanager get-secret-value --secret-id {{SecretsManagerARN}} --version-stage AWSCURRENT)
+                  SECRET=$(echo $SECRETS_MANAGER | jq .SecretString)
+                  USERNAME=$(echo $SECRET | sed 's/^"\(.*\)"$/\1/' | sed 's,\\",",g' | jq .username | sed 's,\\\\\\\\,\\,g' | sed 's,\\\\,\\,g' | sed 's,",,g')
+                  PASSWORD=$(echo $SECRET | sed 's/^"\(.*\)"$/\1/' | sed 's,\\",",g' | sed 's,\\,\\\\,g' | jq .password | sed 's,",,g')
+                  sudo bash -c "echo 'nameserver ${DNS1}' > /etc/resolv.conf"
+                  sudo bash -c "echo 'nameserver ${DNS2}' >> /etc/resolv.conf"
+                  sudo bash -c "echo 'supersede domain-name-servers ${DNS1}, ${DNS2};' > /etc/dhcp/dhclient.conf"
+                  sudo sed -i s/PasswordAuthentication\ no/PasswordAuthentication\ yes/g /etc/ssh/sshd_config
+                  sudo systemctl restart sshd.service
+                  sudo bash -c "echo '%AWS\ Delegated\ Administrators@${DOMAIN} ALL=(ALL:ALL) ALL'" >> /etc/sudoers
+                  CURRENT_DOMAIN=`realm list | grep domain-name | awk '{print $2}'`
+                  if [ ${DOMAIN} == ${CURRENT_DOMAIN} ]; then
+                    echo "nothing to do"
+                    exit 0
+                  else
+                    echo $PASSWORD | sudo realm join -U $USERNAME $DOMAIN --verbose
+                  fi
+              CloudWatchOutputConfig:
+                CloudWatchLogGroupName: '/aws/ssm/ReleaseToProduction'
+                CloudWatchOutputEnabled: true    
+          - name: RevokePermissionsToGetSecret
+            action: aws:executeAwsApi
+            onFailure: Abort
+            inputs:
+              Service: ec2
+              Api: ReplaceIamInstanceProfileAssociation
+              AssociationId: '{{GrantPermissionsToGetSecret.AssociationId}}'
+              IamInstanceProfile: 
+                Arn: '{{DescribeInstanceProfile.InstanceProfileArn}}' 
+          - name: End
+            action: aws:sleep
+            inputs:
+              Duration: PT1S                                                                                                     
+        parameters:
+          AutomationAssumeRole:
+            type: String
+            description: Automation Assume Role Arns
+            default: !GetAtt EC2DocumentAutomationRole.Arn
+          InstanceIds:
+            type: String
+            description: InstanceId
+          InstanceName:
+            type: String
+            description: (Optional) InstanceName
+            default: "null"
+          DomainName: 
+            type: String
+          DirectoryOU:
+            type: String
+            default: !Ref DirectoryOU      
+          DirectoryDNS1: 
+            type: String
+            default: !Ref DirectoryDNS1
+          DirectoryDNS2:
+            type: String
+            default: !Ref DirectoryDNS2
+          SecretsManagerARN:
+            type: String
+            default: !Ref SecretsManagerARN
+          RoleToGetSecret:
+            type: String
+            default: !Ref RoleToGetSecret
+          ActiveDirectory:
+            type: String
+            default: !Ref ActiveDirectory                                   
+
+  RPOnboardDocument:
+    Type: Custom::SSMDocument
+    Properties:
+      Name: RPOnboard
+      ServiceToken: !GetAtt SSMDocFunction.Arn
+      StackName: !Ref AWS::StackName
+      Content:
+        schemaVersion: "0.3"
+        assumeRole: "{{ AutomationAssumeRole }}"
+        description: Automated Release to Production 
+        mainSteps:
+          - name: EnableCloudWatchAlarm
+            action: aws:executeAwsApi
+            inputs:
+              Service: ec2
+              Api: MonitorInstances
+              InstanceIds:
+                - "{{ InstanceIds }}"
+          - name: AddTags
+            action: aws:executeAwsApi
+            inputs:
+              Service: ec2
+              Api: CreateTags
+              Resources:
+                - "{{ InstanceIds }}"
+              Tags:
+                - Key: 'Setup'
+                  Value: 'yes'
+          - name: End
+            action: aws:sleep
+            inputs:
+              Duration: PT1S
+        parameters:
+          AutomationAssumeRole:
+            type: String
+            description: Automation Assume Role Arns
+            default: !GetAtt EC2DocumentAutomationRole.Arn
+          InstanceIds:
+            type: String
+            description: InstanceId
+
+  VerifyAssociation:
+    Type: Custom::SSMDocumentVerifyAssociation
+    Properties:
+      Name: RPVerifyAssociation
+      ServiceToken: !GetAtt SSMDocFunction.Arn
+      StackName: !Ref AWS::StackName
+      Content:
+        schemaVersion: "0.3"
+        assumeRole: "{{ AutomationAssumeRole }}"
+        description: Verify if EC2 has Release to Production Document Asssociated
+        mainSteps:
+          - name: waitForProfileAssociation
+            action: aws:sleep
+            inputs:
+              Duration: PT10S
+          - name: VerifyAssociation 
+            action: 'aws:executeScript'
+            inputs:
+              Runtime: python3.6
+              Handler: script_handler
+              Script: |-
+                import json, boto3, string
+                client_ssm = boto3.client('ssm')
+                def script_handler(events, context):
+                  print(events)
+                  result = {'HasDocumentAssociated' : 'no'}
+                  try:
+                    response_associations = client_ssm.describe_instance_associations_status(InstanceId=events['InstanceId'])
+                  except Exception as e:
+                      print('Error %s' % (e))
+                  for i in response_associations['InstanceAssociationStatusInfos']:
+                    try:
+                      response_describe_associations = client_ssm.describe_association(AssociationId=i['AssociationId'])
+                      if response_describe_associations['AssociationDescription']['Name'] == events['DocumentName']:
+                        result['HasDocumentAssociated'] = 'yes'
+                    except Exception as e:
+                        print('Error %s' % (e))
+                  return result
+              InputPayload:
+                InstanceId: "{{ InstanceIds }}"
+                DocumentName: RPReleaseToProduction
+            outputs:
+              - Name: AssociateDocument
+                Selector: $.Payload.HasDocumentAssociated
+                Type: String
+          - name: CheckReleasetoProductionDocument 
+            action: aws:branch
+            inputs:
+              Choices:
+              - NextStep: AssociateDocument 
+                Variable: "{{VerifyAssociation.AssociateDocument}}"
+                StringEquals: 'no'
+              - NextStep: End 
+                Variable: "{{VerifyAssociation.AssociateDocument}}"
+                StringEquals: 'yes'
+          - name: AssociateDocument
+            action: aws:executeAwsApi
+            onFailure: Abort
+            maxAttempts: 20 
+            timeoutSeconds: 2
+            inputs:
+              Service: ssm
+              Api: CreateAssociation
+              Name: RPReleaseToProduction
+              AssociationName: "{{ InstanceIds }}-onboard"
+              AutomationTargetParameterName: InstanceIds
+              ComplianceSeverity: HIGH
+              Parameters:
+                InstanceIds:
+                  - "{{ InstanceIds }}"
+              Targets:
+                - Key: ParameterValues
+                  Values: 
+                    - "{{ InstanceIds }}"
+          - name: End
+            action: aws:sleep
+            inputs:
+              Duration: PT1S
+        parameters:
+          AutomationAssumeRole:
+            type: String
+            description: Automation Assume Role Arns
+            default: !GetAtt EC2DocumentAutomationRole.Arn
+          InstanceIds:
+            type: String
+            description: InstanceId          
+
+  RemoveAssociation:
+    Type: Custom::SSMDocumentRemoveAssociation
+    Properties:
+      Name: RPRemoveAssociation
+      ServiceToken: !GetAtt SSMDocFunction.Arn
+      StackName: !Ref AWS::StackName
+      Content:
+        schemaVersion: "0.3"
+        assumeRole: "{{ AutomationAssumeRole }}"
+        description: Remove Associations from terminated EC2 instances
+        mainSteps:
+          - name: ListAssociations 
+            action: aws:executeAwsApi
+            inputs:
+              Service: ssm
+              Api: ListAssociations
+              AssociationFilterList:
+                - key: AssociationName
+                  value: "{{InstanceIds}}-onboard" 
+            outputs:
+              - Name: AssociationId
+                Selector: $.Associations[0].AssociationId
+                Type: String      
+          - name: DeleteAssociation 
+            action: aws:executeAwsApi
+            isCritical: false
+            inputs:
+              Service: ssm
+              Api: DeleteAssociation
+              InstanceId: "{{ InstanceIds }}"
+              AssociationId: "{{ ListAssociations.AssociationId }}"
+          - name: RemoveRoleFromInstanceProfile 
+            action: aws:executeAwsApi
+            inputs:
+              Service: iam
+              Api: RemoveRoleFromInstanceProfile  
+              InstanceProfileName: "{{ InstanceIds }}-InstanceProfile"
+              RoleName: "{{ InstanceIds }}-InstanceProfile"
+          - name: DetachRolePolicyAymazonSSMManagedInstanceCore
+            action: aws:executeAwsApi
+            isCritical: false
+            inputs:
+              Service: iam
+              Api: DetachRolePolicy  
+              PolicyArn:  "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+              RoleName: "{{ InstanceIds }}-InstanceProfile"              
+          - name: DetachRolePolicyAmazonSSMDirectoryServiceAccess
+            action: aws:executeAwsApi
+            isCritical: false
+            inputs:
+              Service: iam
+              Api: DetachRolePolicy  
+              PolicyArn:  "arn:aws:iam::aws:policy/AmazonSSMDirectoryServiceAccess"
+              RoleName: "{{ InstanceIds }}-InstanceProfile"
+          - name: DeleteRole
+            action: aws:executeAwsApi
+            isCritical: false
+            inputs:
+              Service: iam
+              Api: DeleteRole  
+              RoleName: "{{ InstanceIds }}-InstanceProfile"                                          
+          - name: End
+            action: aws:sleep
+            inputs:
+              Duration: PT5S              
+        parameters:
+          AutomationAssumeRole:
+            type: String
+            description: Automation Assume Role Arns
+            default: !GetAtt EC2DocumentAutomationRole.Arn
+          InstanceIds:
+            type: String
+            description: InstanceId          
+
+
+  RoleforEventRule: 
+    Type: "AWS::IAM::Role"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W28
+            reason: "RP Requirement"
+    Properties:
+      RoleName: !Join
+      - '-'
+      - - RoleforEventRule
+        - !Select
+          - 0
+          - !Split
+            - '-'
+            - !Select
+              - 2
+              - !Split
+                - /
+                - !Ref 'AWS::StackId'
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - events.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - !Ref ManagedPolicyEventRole
+
+  ManagedPolicyEventRole:
+    Type: AWS::IAM::ManagedPolicy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F40
+            reason: "RP Requirement"
+          - id: W13
+            reason: "RP Requirement"
+    Properties:
+      Description: 'Customer Managed Policy for Automation'
+      Path: / 
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowAutomation 
+            Effect: Allow
+            Action: 
+              - ssm:StartAutomationExecution
+              - iam:PassRole
+            Resource:
+              - '*'
+
+  AssociationRelease:
+    DependsOn:
+      - RPReleaseToProduction
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: EC2ComplianceManagement
+      ComplianceSeverity: CRITICAL
+      Name:  RPReleaseToProduction
+      AutomationTargetParameterName: InstanceIds
+      ScheduleExpression: "rate(30 minutes)"
+      Targets:
+        - Key: tag:Setup
+          Values:
+            - 'yes'      
+
+  MonitorEC2Launch:
+    DependsOn:
+      - VerifyAssociation
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Event Rule for changes in cloudwtach Alarms
+      Targets:
+        - Arn: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/RPVerifyAssociation:$DEFAULT"
+          Id: target-id1
+          RoleArn: !GetAtt RoleforEventRule.Arn
+          InputTransformer:
+            InputPathsMap:
+              InstanceIds: "$.detail.instance-id"
+            InputTemplate: " { \"InstanceIds\" : [ <InstanceIds> ] }"
+      EventPattern:
+        {
+          "source": [
+            "aws.ec2"
+          ],
+          "detail-type": [
+            "EC2 Instance State-change Notification"
+          ],
+          "detail": {
+            "state": [
+              "running"
+            ]
+          }
+        }
+
+  MonitorEC2Terminate:
+    DependsOn:
+      - RemoveAssociation
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Event Rule for changes in Cloudwatch Alarms EC2 terminated instances
+      Targets:
+        - Arn: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/RPRemoveAssociation:$DEFAULT"
+          Id: target-id1
+          RoleArn: !GetAtt RoleforEventRule.Arn
+          InputTransformer:
+            InputPathsMap:
+              InstanceIds: "$.detail.instance-id"
+            InputTemplate: " { \"InstanceIds\" : [ <InstanceIds> ] }"
+      EventPattern:
+        {
+          "source": [
+            "aws.ec2"
+          ],
+          "detail-type": [
+            "EC2 Instance State-change Notification"
+          ],
+          "detail": {
+            "state": [
+              "terminated"
+            ]
+          }
+        }

@@ -1,0 +1,326 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: S3 Logs Bucket
+
+Parameters:
+  S3Central:
+    Type: String
+    Description: ARN of the S3 Central Bucket
+    Default: arn:aws:s3:::aws-controltower-s3-access-logs-932089101044-us-east-1
+  S3CentralAccount:
+    Type: String
+    Description: Account ID of the S3 Central account
+    Default: 932089101044
+  organization:
+    Type: String
+    Description: Organization ID  
+    Default: o-t83rhhwnwz
+    
+Resources:
+
+  S3LoggingBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Sub s3-local-logging-${AWS::AccountId}-${AWS::Region}
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 1
+            Id: Remove replicated logs after 1 days
+            NoncurrentVersionExpirationInDays: 1
+            Status: Enabled
+      ReplicationConfiguration:
+        Role: !Sub arn:aws:iam::${AWS::AccountId}:role/Bunge-AWS-S3-Replication-${AWS::AccountId}-${AWS::Region}
+        Rules:
+          - Prefix: ''
+            Status: Enabled
+            Destination: 
+              Bucket: !Ref S3Central
+              Account: !Ref S3CentralAccount
+              StorageClass: STANDARD
+            Id: MyRule1
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3LoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: bucketpolicy
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action: 
+              - s3:ReplicateObject
+              - s3:ReplicateDelete
+              - s3:ReplicateTags
+              - s3:PutBucketVersioning
+              - s3:GetBucketVersioning
+              - s3:ObjectOwnerOverrideToBucketOwner
+              - s3:GetBucketAcl
+              - s3:PutObject              
+            Resource:
+              - !Sub "arn:aws:s3:::${S3LoggingBucket}/*"
+              - !Sub "arn:aws:s3:::${S3LoggingBucket}"
+            Condition:
+              StringEquals:
+                aws:PrincipalOrgID:
+                  - !Ref organization
+
+  PermissionForCweToInvokeElbLambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt ElbLoggerLambda.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduledElbRule.Arn
+
+  ScheduledElbRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: HourlyElbLambdaTrigger
+      ScheduleExpression: rate(1 hour)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ElbLoggerLambda.Arn
+          Id: UpdateElbLogs
+
+  ElbLoggerLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/Bunge-ElbLogger-Lambda-Role'
+      Code:
+        ZipFile: |
+          import os
+          import boto3
+          import logging
+          _version_ = "1.0"
+          LOGGER = logging.getLogger()
+          LOGGER.setLevel(logging.DEBUG)
+          logging.getLogger('boto3').setLevel(logging.CRITICAL)
+          logging.getLogger('botocore').setLevel(logging.CRITICAL)
+          session = boto3.Session()
+          bucket = os.environ['bucket']
+          region = os.environ['AWS_REGION']
+          account = session.client('sts').get_caller_identity()['Account']
+
+
+          def get_elbv2s(elbv2client):
+              paginator = elbv2client.get_paginator('describe_load_balancers')
+              page_iterator = paginator.paginate()
+              elbv2s = {'LoadBalancers': []}
+              for page in page_iterator:
+                  LOGGER.debug(page)
+                  elbv2s['LoadBalancers'].extend(page['LoadBalancers'])
+              LOGGER.debug(f"elbv2s: {elbv2s}")
+              return elbv2s
+
+
+          def get_elbs(elbclient):
+              paginator = elbclient.get_paginator('describe_load_balancers')
+              page_iterator = paginator.paginate()
+              elbs = {'LoadBalancerDescriptions': []}
+              for page in page_iterator:
+                  LOGGER.debug(page)
+                  elbs['LoadBalancerDescriptions'].extend(
+                      page['LoadBalancerDescriptions'])
+              LOGGER.debug(f"elbs: {elbs}")
+              return elbs
+
+
+          def elb_logging_v2(client, elbs):
+              for elb in elbs:
+                  elb_attr = client.describe_load_balancer_attributes(
+                      LoadBalancerArn=elb['LoadBalancerArn']
+                  )['Attributes']
+                  log_status = list(filter(
+                      lambda logging: logging['Key'] == 'access_logs.s3.enabled',
+                      elb_attr))
+                  if (log_status[0]['Value'] == 'false'):
+                      LOGGER.info(
+                          f"ELB found without logging: {elb['LoadBalancerName']}")
+                      print(elb['LoadBalancerName'])
+                      response = client.modify_load_balancer_attributes(
+                          LoadBalancerArn=elb['LoadBalancerArn'],
+                          Attributes=[
+                              {
+                                  'Key': 'access_logs.s3.enabled',
+                                  'Value': 'true'
+                              },
+                              {
+                                  'Key': 'access_logs.s3.bucket',
+                                  'Value': bucket
+                              },
+                              {
+                                  'Key': 'access_logs.s3.prefix',
+                                  'Value': elb['LoadBalancerName']
+                              }
+                          ]
+                      )
+                      LOGGER.debug(f"Enable Logging Response: {response}")
+              return True
+
+
+          def elb_logging(client, elbs):
+              for elb in elbs:
+                  elb_attr = client.describe_load_balancer_attributes(
+                      LoadBalancerName=elb['LoadBalancerName']
+                  )['LoadBalancerAttributes']
+                  LOGGER.debug(f'Attributes: {elb_attr}')
+                  if (not elb_attr['AccessLog']['Enabled']):
+                      LOGGER.info(
+                          f"ELB found without logging: {elb['LoadBalancerName']}")
+                      response = client.modify_load_balancer_attributes(
+                          LoadBalancerName=elb['LoadBalancerName'],
+                          LoadBalancerAttributes={
+                              'AccessLog': {
+                                  'Enabled': True,
+                                  'S3BucketName': bucket,
+                                  'EmitInterval': 5,
+                                  'S3BucketPrefix': elb['LoadBalancerName']
+                              }
+                          }
+                      )
+                      LOGGER.debug(f"Enable Logging Response: {response}")
+              return True
+
+
+          def enable_logging(session, region):
+              elbv2client = session.client('elbv2', region_name=region)
+              elbv2s = get_elbv2s(elbv2client)['LoadBalancers']
+              if (not elbv2s == []):
+                  LOGGER.info(elbv2s)
+                  response = elb_logging_v2(elbv2client, elbv2s)
+                  LOGGER.debug(response)
+              elbclient = session.client('elb', region_name=region)
+              elbs = get_elbs(elbclient)['LoadBalancerDescriptions']
+              if (not elbs == []):
+                  LOGGER.info(elbs)
+                  response = elb_logging(elbclient, elbs)
+                  LOGGER.debug(response)
+              return True
+
+
+          def main():
+              enable_logging(session, region)
+
+
+          if __name__ == "__main__":
+              main()
+
+
+          def lambda_handler(event, context):
+              main()
+              return True
+      Runtime: python3.7
+      Timeout: 300
+      Environment:
+        Variables:
+          bucket: !Sub elb-logging-${S3CentralAccount}-${AWS::Region}
+
+
+  PermissionForCweToInvokeS3Lambda:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt S3LoggerLambda.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduledS3Rule.Arn
+
+  ScheduledS3Rule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: HourlyS3LambdaTrigger
+      ScheduleExpression: rate(1 hour)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt S3LoggerLambda.Arn
+          Id: UpdateS3Logs
+
+  S3LoggerLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/Bunge-S3Logger-Lambda-Role'
+      Code:
+        ZipFile: |
+
+          import os
+          import boto3
+          import logging
+          _version_ = "1.0"
+          LOGGER = logging.getLogger()
+          LOGGER.setLevel(logging.DEBUG)
+          logging.getLogger('boto3').setLevel(logging.CRITICAL)
+          logging.getLogger('botocore').setLevel(logging.CRITICAL)
+          session = boto3.Session()
+          bucket = os.environ['bucket']
+          region = os.environ['AWS_REGION']
+          account = session.client('sts').get_caller_identity()['Account']
+
+          def enable_logging(session, region):
+              s3client = session.client('s3', region_name=region)
+              s3buckets = s3client.list_buckets()
+              if (not s3buckets == []):
+                  LOGGER.info(s3buckets)
+                  response = s3_logging(s3client, s3buckets)
+                  LOGGER.debug(response)
+              return True
+
+          def get_location(client, bucket_name):
+              response = client.get_bucket_location(Bucket=bucket_name)
+              return response['LocationConstraint']
+
+          def get_bucket_logStatus(client, s3bckt):
+              response = client.get_bucket_logging(Bucket=s3bckt) 
+              LOGGER.debug(f"Enable GetLogging Response: {response}")
+              if ('LoggingEnabled' in response):
+                  logEnableRequired = False
+              else:
+                  logEnableRequired = True
+              return logEnableRequired
+              
+          def s3_logging(client, s3buckets):
+              for s3Bucket in s3buckets['Buckets']:
+                  bucket_location = get_location(client,s3Bucket['Name'])
+                  target_bucket_location = get_location(client, bucket)
+                  if(bucket_location == target_bucket_location):
+                      logEnableRequired = get_bucket_logStatus(client, s3Bucket['Name'])
+                      if (logEnableRequired == True and s3Bucket['Name'] != bucket):
+                          print(s3Bucket['Name'])
+                          response = client.put_bucket_logging(
+                                  Bucket=s3Bucket['Name'],
+                                  BucketLoggingStatus={
+                                      'LoggingEnabled': {
+                                          'TargetBucket': bucket,
+                                          'TargetPrefix': s3Bucket['Name']
+                                      }
+                                  },
+                              )
+                          LOGGER.debug(f"Enable Logging Response: {response}")
+              return True
+
+
+          def main():
+              enable_logging(session, region)
+
+
+          if __name__ == "__main__":
+              main()
+
+
+          def lambda_handler(event, context):
+              main()
+              return True
+      Runtime: python3.7
+      Timeout: 300
+      Environment:
+        Variables:
+          bucket: !Sub s3-local-logging-${AWS::AccountId}-${AWS::Region}

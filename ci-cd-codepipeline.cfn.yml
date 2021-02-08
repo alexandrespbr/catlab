@@ -33,7 +33,7 @@ Parameters:
 
   CodeBuildDockerImage:
     Type: String
-    Default: docker:dind
+    Default: 006577017118.dkr.ecr.us-east-1.amazonaws.com/docker:dind
     Description: Default AWS CodeBuild Docker optimized image
     MinLength: 3
     MaxLength: 100
@@ -192,7 +192,7 @@ Resources:
                   - s3:GetObject
                   - s3:PutObject
                   - s3:GetObjectVersion
-              # - Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${EcrDockerRepository}
+              # - Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/docker
               #   Effect: Allow
               #   Action:
               #     - ecr:GetDownloadUrlForLayer
@@ -235,6 +235,7 @@ Resources:
               - eks:*
               - ec2:*
               - sts:*
+              - ecr:*
             Resource: '*'
           -
             Effect: Allow

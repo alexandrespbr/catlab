@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 Public Block with Event Rules
+
+Resources:
+  ScheduledS3Rule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: HourlyS3LambdaTrigger
+      ScheduleExpression: "rate(2 minutes)"
+      State: ENABLED
+      Targets:
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "S3BlockPublicAccessLambdanbCor"
+              - "Arn"
+          Id: "TargetFunctionV1"
+
+  PermissionForEventsToInvokeLambda: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref "S3BlockPublicAccessLambdanbCor"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn:
+        Fn::GetAtt: 
+          - "ScheduledS3Rule"
+          - "Arn"
+  
+  S3BlockPublicAccessnbCor:
+    Type: 'Custom::S3BlockPublicAccess'
+    Properties:
+      BlockPublicAcls: true
+      BlockPublicPolicy: true
+      IgnorePublicAcls: true
+      RestrictPublicBuckets: true
+      ServiceToken:
+        'Fn::GetAtt':
+          - S3BlockPublicAccessLambdanbCor
+          - Arn
+
+  S3BlockPublicAccessLambdaRolenbCor:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: s3blockpublic-LambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: s3inline
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:PutAccountPublicAccessBlock'
+                  - 's3:GetAccountPublicAccessBlock'
+                Resource: '*'
+  S3BlockPublicAccessLambdanbCor:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |
+          'use strict';
+          const AWS = require('aws-sdk');
+          const response = require('./cfn-response');
+          const s3control = new AWS.S3Control();
+
+          exports.handler = (event, context, cb) => {
+              
+            const account_id = JSON.stringify(context.invokedFunctionArn).split(':')[4]    
+            console.log('Invoke:', JSON.stringify(event));
+            
+            const done = (err, data) => {
+              if (err) {
+                console.log('Error: ', err);
+                response.send(event, context, response.FAILED, {}, 'CustomResourcePhysicalID');
+              } else {
+                response.send(event, context, response.SUCCESS, {}, 'CustomResourcePhysicalID');
+              }
+            };
+
+            s3control.putPublicAccessBlock({
+              AccountId: account_id,
+              PublicAccessBlockConfiguration:{
+                  BlockPublicAcls: true,
+                  BlockPublicPolicy: true,
+                  IgnorePublicAcls: true,
+                  RestrictPublicBuckets: true')
+              }
+              }, done);
+          };
+
+      Handler: index.handler
+      MemorySize: 128
+      Role:
+        'Fn::GetAtt':
+          - S3BlockPublicAccessLambdaRolenbCor
+          - Arn
+      Runtime: nodejs10.x
+      Timeout: 120

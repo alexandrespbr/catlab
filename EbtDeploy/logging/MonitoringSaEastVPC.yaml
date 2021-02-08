@@ -13,37 +13,37 @@ Parameters:
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
-    Default: 10.192.0.0/16
+    Default: 10.193.2.0/23
 
   PublicSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
     Type: String
-    Default: 10.192.10.0/24
+    Default: 10.193.2.0/26
 
   PublicSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
     Type: String
-    Default: 10.192.11.0/24
+    Default: 10.193.2.64/26
 
   PrivateSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.192.20.0/24
+    Default: 10.193.2.128/26
 
   PrivateSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.192.21.0/24
+    Default: 10.193.2.192/26
 
   PrivateSubnet3CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.192.22.0/24
+    Default: 10.193.3.0/26
 
   PrivateSubnet4CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.192.23.0/24
+    Default: 10.193.3.64/26
 
   NatGateway: 
     Description: Create NatGateway (Yes or No)?.
@@ -54,8 +54,42 @@ Parameters:
       - "No"
     ConstraintDescription: must specify Yes or No.
 
+  TransitGateway: 
+    Description: Create TransitGateway (Yes or No)?.
+    Default: "No"
+    Type: String
+    AllowedValues: 
+      - "Yes"
+      - "No"
+    ConstraintDescription: must specify Yes or No.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: "Network Configuration"
+      Parameters:
+      - EnvironmentName
+      - VpcCIDR
+      - NatGateway
+      - TransitGateway
+    - Label:
+        default: "Public Network Configuration"
+      Parameters:
+      - PublicSubnet1CIDR
+      - PublicSubnet2CIDR
+    - Label:
+        default: "Private Network Configuration"
+      Parameters:
+      - PrivateSubnet1CIDR
+      - PrivateSubnet2CIDR
+      - PrivateSubnet3CIDR
+      - PrivateSubnet4CIDR
+
 Conditions: 
   CreateNgwResource: !Equals [ !Ref NatGateway, "Yes" ]
+  CreateTgwResource: !Equals [ !Ref TransitGateway, "Yes" ]
+
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -355,6 +389,22 @@ Resources:
       ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
       VpcId: !Ref VPC
 
+  TransitGateway01:
+    Type: AWS::EC2::TransitGateway
+    Condition: CreateTgwResource
+    Properties:
+      AmazonSideAsn: 65000
+      Description: "TGW Transit"
+      AutoAcceptSharedAttachments: enable
+      DefaultRouteTableAssociation: enable
+      DnsSupport: enable
+      VpnEcmpSupport: enable
+      Tags:
+      - Key: Name
+        Value: !Sub "${EnvironmentName}-TGW01"
+      - Key: Application
+        Value: !Ref 'AWS::StackId'
+
 Outputs:
   MyVPC:
     Description: A reference to the created VPC
@@ -411,3 +461,10 @@ Outputs:
     Value: !Ref IngressSecurityGroup
     Export:
       Name: ExIngressSecurityGroup
+
+  myTransitGateway:
+    Description: "My TransitGatewaId"
+    Condition: CreateTgwResource
+    Value: !Ref TransitGateway01
+    Export:
+      Name: TransitGatewayExport

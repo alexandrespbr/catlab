@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template creates a Network Load Balancer in 2 AZs with EIPs listening on a TCP port 
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Networking Configuration
+        Parameters:
+          - VPC
+          - CentralLoggingAccountPrivateSubnet1
+          - CentralLoggingAccountPrivateSubnet2
+Parameters:
+  VPC:
+    Type: 'AWS::EC2::VPC::Id'
+  CentralLoggingAccountPrivateSubnet1:
+    Description: Provide Private Subnets associated. Select atleast one subnet in each AZ.
+    Type: 'AWS::EC2::Subnet::Id'
+  CentralLoggingAccountPrivateSubnet2:
+    Description: Provide Private Subnets associated. Select atleast one subnet in each AZ.
+    Type: 'AWS::EC2::Subnet::Id'
+  AccountIds:
+    Description: Principals allowed to access Privatelink
+    Type: CommaDelimitedList
+    Default: 119275499120
+Resources:
+  NetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internal
+      Subnets:
+        - !Ref CentralLoggingAccountPrivateSubnet1
+        - !Ref CentralLoggingAccountPrivateSubnet2
+      Type: network
+      IpAddressType: ipv4
+  TargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: TGNLBESInternal
+      Port: 443
+      Protocol: TCP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '20'
+      TargetType: ip
+      Targets:
+        - Id: 10.192.3.34
+        - Id: 10.192.3.106
+      VpcId: !Ref VPC
+  TargetGroup2:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: TGNLBMSKInternal
+      Port: 9094
+      Protocol: TCP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '20'
+      TargetType: ip
+      Targets:
+        - Id: 10.192.3.45
+        - Id: 10.192.3.126
+      VpcId: !Ref VPC
+  Listener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    DependsOn: TargetGroup
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: '443'
+      Protocol: TCP
+  Listener2:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    DependsOn: TargetGroup2
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup2
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: '9094'
+      Protocol: TCP
+
+  EndpointService:
+    Type: 'AWS::EC2::VPCEndpointService'
+    Properties:
+      NetworkLoadBalancerArns: 
+        - !Ref NetworkLoadBalancer
+      AcceptanceRequired: false
+  
+  EndpointPermissions:
+    Type: AWS::EC2::VPCEndpointServicePermissions
+    Properties: 
+      AllowedPrincipals: !Split
+          - ','
+          - !Sub
+            - 'arn:aws:iam::${inner}:root'
+            - inner: !Join
+              - ':root,arn:aws:iam::'
+              - !Ref AccountIds
+      ServiceId: !Ref EndpointService
+Outputs:
+  NLB:
+    Description: ARN for the NLB
+    Value: !Ref NetworkLoadBalancer
+  ServiceEndpoint:
+    Description: Endpoint service details
+    Value: !Ref EndpointService
+  ServiceEndpointName:
+    Description: Endpoint service name
+    Value: !Join
+      - ''
+      - - 'com.amazonaws.vpce.'
+        - !Ref "AWS::Region"
+        - '.'
+        - !Ref 'EndpointService'
