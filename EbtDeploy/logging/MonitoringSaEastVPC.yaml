@@ -389,6 +389,19 @@ Resources:
       ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
       VpcId: !Ref VPC
 
+  CreateS3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet4
+      SecurityGroupIds:
+        - !Ref IngressSecurityGroup
+      PrivateDnsEnabled: false
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref VPC
+
   TransitGateway01:
     Type: AWS::EC2::TransitGateway
     Condition: CreateTgwResource

@@ -16,7 +16,6 @@ Metadata:
           default: Reverse Proxy Target Configurations
         Parameters:
           - ReverseProxyInstanceType          
-          - ReverseProxyKeyName
           - ReverseProxySSHLocation
           - ElasticSearchDomainName
 
@@ -47,10 +46,6 @@ Parameters:
     - t2.micro
     - t2.small
    ConstraintDescription: must be a valid EC2 instance type.
-  ReverseProxyKeyName:
-   Description: The EC2 Key Pair to allow SSH access to the reverse proxy instances
-   Type: 'AWS::EC2::KeyPair::KeyName'
-   ConstraintDescription: must be the name of an existing EC2 KeyPair.
   ReverseProxySSHLocation:
    Description: The IP address range that can be used to SSH to the reverse proxy instances
    Type: String
@@ -214,7 +209,6 @@ Resources:
   ReverseProxyLaunchConfig:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
-      KeyName: !Ref ReverseProxyKeyName
       ImageId: !FindInMap 
         - AWSRegionArch2AMI
         - !Ref 'AWS::Region'
@@ -334,8 +328,13 @@ Resources:
   EndpointPermissions:
     Type: AWS::EC2::VPCEndpointServicePermissions
     Properties: 
-      AllowedPrincipals: 
-        - arn:aws:iam::119275499120:root
+      AllowedPrincipals: !Split
+          - ','
+          - !Sub
+            - 'arn:aws:iam::${inner}:root'
+            - inner: !Join
+              - ':root,arn:aws:iam::'
+              - !Ref AccountIds
       ServiceId: !Ref EndpointService
 Outputs:
   NLB:

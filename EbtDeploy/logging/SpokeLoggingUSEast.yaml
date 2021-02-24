@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template creates Interface Endpoints in 2 AZs with EIPs listening on a TCP port 
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Customer Name or (OU Name)
+        Parameters:
+          - Name
+      - Label:
+          default: Networking Configuration
+        Parameters:
+          - VPC
+          - ConsumerAccountSubnets
+      - Label:
+          default: Endpoint Details
+        Parameters:
+          - EndpointServiceName
+Parameters:
+  Name:
+    Description: Enter Customer Name or OU Name (REQUIRED)
+    Type: String
+    AllowedPattern: ".+"
+  VPC:
+    Type: 'AWS::EC2::VPC::Id'
+  ConsumerAccountSubnets:
+    Description: Consumer Account Filebeat Subnets. Ensure the subnets are in atleast two AZ's
+    Type: 'List<AWS::EC2::Subnet::Id>'
+  EndpointServiceName:
+    Description: Enter Endpoint Service Name obtained from the Provider (REQUIRED)
+    Type: String
+    Default: com.amazonaws.vpce.us-east-1.vpce-svc-008751d9883c6d228
+    AllowedPattern: ".+"
+
+Resources:
+  InterfaceEndpointSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable VPCEndpoint Access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '9094'
+          ToPort: '9094'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref VPC
+
+  InterfaceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      VpcId: !Ref VPC
+      VpcEndpointType: Interface
+      ServiceName: !Ref EndpointServiceName
+      PrivateDnsEnabled: false
+      SubnetIds: !Ref ConsumerAccountSubnets
+      SecurityGroupIds: 
+        - !Ref InterfaceEndpointSecurityGroup
+
+  SSMCustomerName:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /ebt/${Name}/customerName
+      Type: String
+      Value: !Ref Name
+  SSMVPCEndpoint:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /ebt/${Name}/vpcEndpointDns
+      Type: String
+      Value: !Select 
+      - 1
+      - !Split 
+        - ':'
+        - !Select
+          - 0
+          - !GetAtt 
+            - InterfaceEndpoint
+            - DnsEntries
+
+  DNS: 
+    Type: "AWS::Route53::HostedZone"
+    Properties: 
+      HostedZoneConfig: 
+        Comment: 'My hosted zone for SpokeLogging'
+      Name: kafka.us-east-1.amazonaws.com
+      VPCs: 
+        - 
+          VPCId: !Ref VPC
+          VPCRegion: 'us-east-1'
+      HostedZoneTags: 
+        - 
+          Key: 'Name'
+          Value: 'SpokeLoggingKafkaZoneUSEast'
+
+  myDNSRecord1:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      Comment: DNS name for SpokeLogging
+      HostedZoneId: !Ref DNS
+      RecordSets:
+        - Name: b-1.msp-kafka-embratel.fqdg9l.c11.kafka.us-east-1.amazonaws.com
+          Type: A
+          AliasTarget:
+            DNSName: !Select 
+            - 1
+            - !Split 
+              - ':'
+              - !Select
+                - 0
+                - !GetAtt 
+                  - InterfaceEndpoint
+                  - DnsEntries
+            HostedZoneId: !Select 
+            - 0
+            - !Split 
+              - ':'
+              - !Select
+                - 0
+                - !GetAtt 
+                  - InterfaceEndpoint
+                  - DnsEntries
+
+  myDNSRecord2:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      Comment: DNS name for SpokeLogging
+      HostedZoneId: !Ref DNS
+      RecordSets:
+        - Name: b-2.msp-kafka-embratel.fqdg9l.c11.kafka.us-east-1.amazonaws.com
+          Type: A
+          AliasTarget:
+            DNSName: !Select 
+            - 1
+            - !Split 
+              - ':'
+              - !Select
+                - 0
+                - !GetAtt 
+                  - InterfaceEndpoint
+                  - DnsEntries
+            HostedZoneId: !Select 
+            - 0
+            - !Split 
+              - ':'
+              - !Select
+                - 0
+                - !GetAtt 
+                  - InterfaceEndpoint
+                  - DnsEntries
+
+Outputs:
+  InterfaceEndpontID:
+    Description: Interface Endpoint ID
+    Value: !Ref InterfaceEndpoint
+
+  DnsOutput:
+    Description: Interface Endpoint ID
+    Value: !Ref DNS
+    Export:
+      Name: myDns
+
+  InterfaceEndpontDnsEntry:
+    Description: Interface Endpoint DnsEntry
+    Value: !Select 
+      - 1
+      - !Split 
+        - ':'
+        - !Select
+          - 0
+          - !GetAtt 
+            - InterfaceEndpoint
+            - DnsEntries
+
+  InterfaceEndpontHostedZoned:
+    Description: Interface Endpoint HostedZone
+    Value: !Select 
+      - 0
+      - !Split 
+        - ':'
+        - !Select
+          - 0
+          - !GetAtt 
+            - InterfaceEndpoint
+            - DnsEntries

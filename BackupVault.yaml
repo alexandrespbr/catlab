@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  BackupVaultCrossAccountShortRetention:
+    AllowedPattern: ^[a-zA-Z0-9\-\_\.]{1,50}$
+    ConstraintDescription: Backup vault name is case sensitive. Must contain from 2 to 50 alphanumeric and '-_' characters.
+    Description: 'Backup Vault for standard Retention 15 days'
+    Default: 'ShortRetention'
+    Type: String
+
+  BackupVaultCrossAccountLongRetention:
+    AllowedPattern: ^[a-zA-Z0-9\-\_\.]{1,50}$
+    ConstraintDescription: Backup vault name is case sensitive. Must contain from 2 to 50 alphanumeric and '-_' characters.
+    Description: 'Backup Vault for long Retention - 35 days'
+    Default: 'LongRetention'
+    Type: String
+
+
+Resources:
+  ShortRetentionBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: !Ref BackupVaultCrossAccountShortRetention
+
+
+  LongRetentionBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: !Ref BackupVaultCrossAccountLongRetention

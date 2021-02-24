@@ -1,0 +1,48 @@
+{
+    "Version": "2012-10-17",
+    "Id": "Policy1609364699970",
+    "Statement": [
+        {
+            "Sid": "Stmt1609364185303",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:ListBucket",
+            "Resource": "arn:aws:s3:::s3-msp-embratel-templates",
+            "Condition": {
+                "StringEquals": {
+                    "aws:PrincipalOrgID": "o-gh11weqevk"
+                }
+            }
+        },
+        {
+            "Sid": "Stmt1612546958174",
+            "Action": "s3:ListBucket",
+            "Effect": "Allow",
+            "Resource": "arn:aws:s3:::s3-msp-embratel-templates",
+            "Principal": {
+              "AWS": "arn:aws:iam::369931610880:root"
+            }
+        },
+        {
+            "Sid": "Stmt1612546958174",
+            "Action": "s3:GetObject",
+            "Effect": "Allow",
+            "Resource": "arn:aws:s3:::s3-msp-embratel-templates/*",
+            "Principal": {
+              "AWS": "arn:aws:iam::369931610880:root"
+            }
+        },
+        {
+            "Sid": "Stmt1609364697767",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::s3-msp-embratel-templates/*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:PrincipalOrgID": "o-gh11weqevk"
+                }
+            }
+        }
+    ]
+}

@@ -170,6 +170,7 @@ Resources:
         - 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'
         - 'arn:aws:iam::aws:policy/AmazonSSMDirectoryServiceAccess'
         - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess'
         - 'arn:aws:iam::aws:policy/IAMReadOnlyAccess'
         - !Ref AutomationPolicy
 
@@ -618,13 +619,13 @@ Resources:
                 client_iam = boto3.client('iam')
                 def script_handler(events, context):
                   print(events)
-                  mandatory_policies = ['AmazonSSMManagedInstanceCore', 'AmazonSSMDirectoryServiceAccess', 'AmazonS3ReadOnlyAccess', 'EC2PutLogsCloudWatch']
+                  mandatory_policies = ['AmazonSSMManagedInstanceCore', 'AmazonSSMDirectoryServiceAccess', 'AmazonSSMReadOnlyAccess', 'AmazonS3ReadOnlyAccess', 'EC2PutLogsCloudWatch']
                   current_policies = []
                   diff = []
                   try:
                     response = client_iam.list_attached_role_policies(RoleName=events['RoleName'])
                     for i in response['AttachedPolicies']:
-                      if i['PolicyName'] == 'AmazonSSMManagedInstanceCore' or i['PolicyName'] == 'AmazonSSMDirectoryServiceAccess' or i['PolicyName'] == 'AmazonS3ReadOnlyAccess' or i['PolicyName'] == 'EC2PutLogsCloudWatch':
+                      if i['PolicyName'] == 'AmazonSSMManagedInstanceCore' or i['PolicyName'] == 'AmazonSSMDirectoryServiceAccess' or i['PolicyName'] == 'AmazonSSMReadOnlyAccess' or i['PolicyName'] == 'AmazonS3ReadOnlyAccess' or i['PolicyName'] == 'EC2PutLogsCloudWatch':
                         current_policies.append(i['PolicyName'])
                   except Exception as e:
                       print('Error %s' % (e))
@@ -765,37 +766,7 @@ Resources:
                 Type: String  
               - Name: InstanceProfileArn
                 Selector: "$.IamInstanceProfileAssociations[0].IamInstanceProfile.Arn"
-                Type: String 
-          - name: InstallBeats
-            action: aws:runCommand
-            onFailure: Abort
-            isCritical: false
-            inputs:
-              DocumentName: AWS-RunPowerShellScript
-              InstanceIds:
-                - '{{ InstanceIds }}'
-              Parameters:
-                commands: |-
-                  # Install choco package manager`
-                  Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-
-                  # Install AWSCLI
-                  choco install awscli -y
-
-
-                  # Install Winlogbeat
-                  choco install winlogbeat-oss -y
-
-                  # Refreshing path
-                  $env:Path += ";C:\ProgramData\chocolatey\bin" 
-                  $env:Path += ";C:\Program Files\Amazon\AWSCLIV2\" 
-                  $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."   
-                  Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
-
-                  $bucket_name = "s3-msp-embratel-templates"
-
-                  aws s3 cp s3://$bucket_name/cloudformation/logging/winlogbeat.yml C:\ProgramData\Elastic\Beats\winlogbeat\winlogbeat.yml 
-                  Start-Service winlogbeat                             
+                Type: String                                        
           - name: CheckHostnameWindows
             action: aws:runCommand
             onFailure: step:RenameWindows
@@ -1016,13 +987,20 @@ Resources:
                 - '{{ InstanceIds }}'
               Parameters:
                 commands: |-
-                  sudo rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch                  
-                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/elastic.repo /etc/yum.repos.d/elastic.repo               
+                  sudo rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
+                  EC2_AVAIL_ZONE=`curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone`
+                  EC2_REGION="`echo \"$EC2_AVAIL_ZONE\" | sed 's/[a-z]$//'`"
+                  export AWS_DEFAULT_REGION=$EC2_REGION
+                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/elastic.repo /etc/yum.repos.d/elastic.repo
                   sudo yum install filebeat metricbeat -y
-                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/filebeat-linux.yml /etc/filebeat/filebeat.yml 
-                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/metricbeat-linux.yml  /etc/metricbeat/metricbeat.yml 
+                  customername=$(aws ssm describe-parameters --output text |grep customerName| awk '{print $5}' |xargs aws ssm get-parameter --output text --name | awk '{print $5}' | cut -d / -f3)
+                  vpcedns=$(aws ssm get-parameter --name /ebt/$customername/vpcEndpointDns |grep Value| awk '{print $2}' | cut -d '"' -f 2)
+                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/filebeat-linux.yml /etc/filebeat/filebeat.yml
+                  #sed -i "s/hosts:.*/hosts: [\"$vpcedns:9094\"]/" metricbeat.yml /etc/filebeat/filebeat.yml
+                  aws s3 cp s3://s3-msp-embratel-templates/cloudformation/logging/metricbeat-linux.yml  /etc/metricbeat/metricbeat.yml
+                  #sed -i "s/hosts:.*/hosts: [\"$vpcedns:9094\"]/" metricbeat.yml /etc/metricbeat/metricbeat.yml
                   sudo systemctl enable metricbeat
-                  sudo systemctl restart metricbeat                             
+                  sudo systemctl restart metricbeat                         
                   sudo systemctl enable filebeat
                   sudo systemctl restart filebeat
               CloudWatchOutputConfig:
