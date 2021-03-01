@@ -62,7 +62,7 @@ Resources:
         SubnetIds:
         - !Ref EKSSubnetId1
         - !Ref EKSSubnetId2
-      Version: 1.18
+      Version: 1.19
 
   EKSNodegroup:
     Type: 'AWS::EKS::Nodegroup'

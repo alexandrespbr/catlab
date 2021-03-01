@@ -1,0 +1,191 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+    - Label:
+        default: 'Elasticsearch Parameters'
+      Parameters:
+      - DomainName
+      - ElasticsearchVersion
+      - EBSEnabled
+      - EBSVolumeSize
+      - WarmCount
+      - WarmType
+      - ClusterInstanceCount
+      - ClusterInstanceType
+      - DedicatedMasterCount
+      - DedicatedMasterType
+      - SubDomainNameWithDot
+      - ElasticSubnetId1 
+      - ElasticSubnetId2         
+      - MasterUserName
+      - MasterUserPassword 
+      - VPCID 
+    - Label:
+        default: 'Kafka Parameters'
+      Parameters:
+      - KafkaClusterName
+      - KafkaSubnet1Id
+      - KafkaSubnet2Id
+Parameters:
+  KafkaClusterName:
+    Description: 'The Kafka cluster name'
+    Type: String 
+  VPCID: 
+    Description: 'The VPC for ES Cluster'
+    Type: String 
+  MasterUserPassword:
+    Description: 'The master password for ES'
+    Type: String 
+    NoEcho: true
+  MasterUserName:
+    Description: 'The master username for ES'
+    Type: String 
+  WarmType:
+    Description: 'The instance type for your warm nodes.'
+    Type: String 
+    Default: "ultrawarm1.medium.elasticsearch"
+  ElasticSubnetId1:
+    Description: 'Please enter the Elasticsearch SubnetId1'
+    Type: String 
+  ElasticSubnetId2:
+    Description: 'Please enter the Elasticsearch SubnetId2'
+    Type: String     
+  WarmCount:
+    Description: 'The number of Warm nodes.'
+    Type: String
+    Default: 2
+  DomainName:
+    Description: 'A name for the Amazon ES domain.'
+    Type: String
+  EBSEnabled:
+    Description: 'Specifies whether Amazon EBS volumes are attached to data nodes in the Amazon ES domain (some instance types come with instance store that you can use instead).'
+    Type: String
+    AllowedValues: [true, false]
+    Default: true
+  EBSVolumeSize:
+    Description: 'The size of the EBS volume for each data node. The minimum and maximum size of an EBS volume depends on the EBS volume type and the instance type to which it is attached.'
+    Type: Number
+    Default: 10
+  ElasticsearchVersion:
+    Description: 'Elasticsearch version'
+    Type: String
+    Default: '7.9'
+    AllowedValues: ['7.9','7.8','7.7', '7.4', '7.1', '6.8', '6.7'] # aws es list-elasticsearch-versions --query "ElasticsearchVersions[]"
+  ClusterInstanceCount:
+    Description: 'The number of data nodes (instances) to use in the Amazon ES domain.'
+    Type: Number
+    Default: 2
+  ClusterInstanceType:
+    Description: 'The instance type for your data nodes.'
+    Type: 'String'
+    Default: 'c5.large.elasticsearch'
+  DedicatedMasterCount:
+    Description: 'The number of dedicated master nodes (instances) to use in the Amazon ES domain (set to 0 to disable dedicated master nodes).'
+    Type: Number
+    Default: 3
+  DedicatedMasterType:
+    Description: 'The instance type for your dedicated master nodes.'
+    Type: 'String'
+    Default: 'c5.large.elasticsearch'
+  KafkaSubnet1Id:
+    Description: Please enter the kafka SubnetId1
+    Type: String
+  KafkaSubnet2Id:
+    Description: Please enter the kafka SubnetId2
+    Type: String
+Conditions:
+  HasSingleClusterInstance: !Equals [!Ref ClusterInstanceCount, '1']
+  HasDedicatedMasterNodes: !Not [!Equals [!Ref DedicatedMasterCount, 0]]
+  HasEBSEnabled: !Equals [!Ref EBSEnabled, 'true']
+Resources:
+  SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: !Ref 'AWS::StackName'
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: 443
+        ToPort: 443
+      VpcId: !Ref VPCID
+  SecurityGroupSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: SecurityGroup
+    Properties:
+      GroupId: !GetAtt SecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: '0'
+      ToPort: '65535'
+      SourceSecurityGroupId: !GetAtt SecurityGroup.GroupId
+  ElasticsearchDomain:
+    Type: 'AWS::Elasticsearch::Domain'
+    Properties:
+      AdvancedOptions:
+        rest.action.multi.allow_explicit_index: "true"
+      AdvancedSecurityOptions:          
+        Enabled: true
+        InternalUserDatabaseEnabled: true
+        MasterUserOptions: 
+          MasterUserName: !Ref MasterUserName
+          MasterUserPassword: !Ref MasterUserPassword 
+      EncryptionAtRestOptions:
+        Enabled: true
+      NodeToNodeEncryptionOptions:
+        Enabled: true          
+      VPCOptions:
+        SubnetIds:
+          - Ref: ElasticSubnetId1
+          - Ref: ElasticSubnetId2
+        SecurityGroupIds:
+          - !GetAtt SecurityGroup.GroupId        
+      AccessPolicies:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS: '*'
+          Action:
+          - 'es:ESHttp*'
+          Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${DomainName}/*'
+      DomainName: !Ref 'DomainName'   
+      DomainEndpointOptions:
+        EnforceHTTPS: true
+        TLSSecurityPolicy: "Policy-Min-TLS-1-0-2019-07"
+      EBSOptions: !If
+      - HasEBSEnabled
+      - EBSEnabled: true
+        VolumeSize: !Ref EBSVolumeSize
+        VolumeType: gp2
+      - EBSEnabled: false
+      ElasticsearchClusterConfig:
+        DedicatedMasterCount: !If [HasDedicatedMasterNodes, !Ref DedicatedMasterCount, !Ref 'AWS::NoValue']
+        DedicatedMasterEnabled: !If [HasDedicatedMasterNodes, true, false]
+        DedicatedMasterType: !If [HasDedicatedMasterNodes, !Ref DedicatedMasterType, !Ref 'AWS::NoValue']
+        InstanceCount: !Ref ClusterInstanceCount
+        InstanceType: !Ref ClusterInstanceType
+        ZoneAwarenessEnabled: !If [HasSingleClusterInstance, false, true]
+        WarmEnabled: true
+        WarmCount: !Ref WarmCount
+        WarmType: !Ref WarmType
+      ElasticsearchVersion: !Ref ElasticsearchVersion
+      SnapshotOptions:
+        AutomatedSnapshotStartHour: 10
+    UpdatePolicy:
+      EnableVersionUpgrade: true
+
+  KafkaCluster:
+    Type: 'AWS::MSK::Cluster'
+    DependsOn: ElasticsearchDomain
+    Properties:
+      KafkaVersion: 2.2.1
+      NumberOfBrokerNodes: 2
+      ClusterName: !Ref KafkaClusterName
+      BrokerNodeGroupInfo:
+        InstanceType: kafka.t3.small
+        SecurityGroups:
+          - !GetAtt SecurityGroup.GroupId          
+        ClientSubnets:
+          - !Ref KafkaSubnet1Id
+          - !Ref KafkaSubnet2Id

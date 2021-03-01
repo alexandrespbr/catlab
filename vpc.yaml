@@ -47,7 +47,7 @@ Parameters:
 
   NatGateway: 
     Description: Create NatGateway (Yes or No)?.
-    Default: "No"
+    Default: "Yes"
     Type: String
     AllowedValues: 
       - "Yes"
