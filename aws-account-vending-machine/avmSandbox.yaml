@@ -15,7 +15,7 @@ Parameters:
   SourceTemplate:
     Description: "Enter the template URL for the cloudformation template to launch account creation"
     Type: String
-    Default: "https://raw.githubusercontent.com/alexandrespbr/catlab/main/aws-account-vending-machine/accountBuilder.yml"
+    Default: "https://raw.githubusercontent.com/alexandrespbr/catlab/main/aws-account-vending-machine/accountBuilder.yaml"
 
   AccountAdministrator:
     Description: "Enter the ARN of the IAM entity (role or user or group) that will be performing account creation from AWS Service Catalog"
