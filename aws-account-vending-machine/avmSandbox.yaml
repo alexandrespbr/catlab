@@ -8,7 +8,7 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: This template sets up the infrastructure required for an AWS Service Catalog based Account Vending Machine. (fdp-1pg158jfl)
 Parameters:
   SourceBucket:
-    Description: "Bucket name of the S3 bucket holding all the files for the Account Vending Machine set up"
+    Description: "Existing Bucket name of the S3 bucket holding all the files for the Account Vending Machine set up"
     Type: String
     Default: "avmsandboxlab-andrdal"
 
