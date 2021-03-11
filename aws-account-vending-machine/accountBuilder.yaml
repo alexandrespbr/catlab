@@ -13,7 +13,6 @@ Metadata:
       - Label:
           default: Parameters for the new account to be created
         Parameters:
-          - MasterLambdaArn
           - AccountEmail
           - OrganizationalUnitName
           - AccountName
@@ -21,12 +20,9 @@ Metadata:
           - StackRegion
           - SourceBucket
           - BaselineTemplate
+          - LambdaMasterArn
 
 Parameters:
-  MasterLambdaArn:
-    Description: "Enter the ARN for the lambda function in your root account for creating accounts (OUTPUTS from Infrastructure Setup CloudFormation)"
-    Type: String
-
   AccountEmail:
    Description: "Email address of the AWS account to be created"
    Type: String
@@ -65,7 +61,7 @@ Parameters:
 
   LambdaMasterArn:
       Type : 'AWS::SSM::Parameter::Value<String>'
-      Default: ‘/avm/sandbox/masterarn’
+      Default: '/avm/sandbox/masterarn'
 
 Resources:
 
