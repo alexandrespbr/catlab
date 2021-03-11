@@ -63,7 +63,7 @@ Parameters:
     Type: String
     Default: "AccountBaseline.yaml"
 
-  LambdaMasterArn :
+  LambdaMasterArn:
       Type : 'AWS::SSM::Parameter::Value<String>'
       Default: ‘/avm/sandbox/masterarn’
 
@@ -74,7 +74,7 @@ Resources:
     DeletionPolicy: Retain
     Properties:
       #ServiceToken: !Ref MasterLambdaArn
-      ServiceToken: !Ref MasterLambdaArn
+      ServiceToken: !Ref LambdaMasterArn
       AccountEmail : !Ref AccountEmail
       AccountName : !Ref AccountName
       OrganizationalUnitName: !Ref 'OrganizationalUnitName'
