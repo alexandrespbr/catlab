@@ -36,7 +36,7 @@ Resources:
           Mode: "Active"
       Code:
         S3Bucket: !Ref SourceBucket
-        S3Key: "AccountCreationLambda.zip"
+        S3Key: "resources/AccountCreationLambda.zip"
 
   LambdaExecuteRole:
     Type: "AWS::IAM::Role"
@@ -135,4 +135,6 @@ Outputs:
   AccountLambda:
     Description: ARN of the account creation lambda function
     Value: !GetAtt AccountBuilderLambda.Arn
+    Export:
+      Name: !Sub "AccountLambdaSandbox"
 
