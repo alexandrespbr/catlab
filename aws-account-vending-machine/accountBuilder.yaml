@@ -50,7 +50,7 @@ Parameters:
     Default: "us-east-1"
     Type: String
     AllowedPattern: ".+"
-    AllowedValues: ["us-east-2","us-east-1","us-west-1","us-west-2","ap-northeast-1","ap-northeast-2","ap-northeast-3","ap-south-1","ap-southeast-1","ap-southeast-2","ca-central-1","cn-north-1","cn-northwest-1","eu-central-1","eu-west-1","eu-west-2","eu-west-3","sa-east-1"]
+    AllowedValues: ["us-east-2","us-east-1","us-west-1","us-west-2","ca-central-1","cn-north-1","cn-northwest-1","sa-east-1"]
     ConstraintDescription: "Must be a valid AWS region"
 
   SourceBucket:
@@ -61,7 +61,7 @@ Parameters:
   BaselineTemplate:
     Description: "Baseline template to be deployed in the vended account."
     Type: String
-    Default: "Accountbaseline.yml"
+    Default: "AccountBaseline.yaml"
 
 Resources:
 
@@ -73,7 +73,7 @@ Resources:
       AccountEmail : !Ref AccountEmail
       AccountName : !Ref AccountName
       OrganizationalUnitName: !Ref 'OrganizationalUnitName'
-      StackName : 'avm-baseline-stack'
+      StackName : 'avm-baseline-sandbox-stack'
       StackRegion : !Ref StackRegion
       ServiceCatalogUserName : 'service-catalog-user'
       ServiceCatalogUserPassword : 'service-catalog-2021'

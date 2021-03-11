@@ -2,7 +2,7 @@
 #version1- creates a new IAM user with the ServiceCatalog permission set
 
 AWSTemplateFormatVersion: 2010-09-09
-Description: Baseline IAM resources for new account (fdp-1pg15ff8j)
+Description: Baseline IAM resources for new account
 
 Parameters:
   ServiceCatalogUserName:
@@ -15,6 +15,39 @@ Parameters:
     Description: Password for the IAM user for ServiceCatalog in the newly vended account
 
 Resources:
+
+  BudgetConfiguration:
+    Type: "AWS::Budgets::Budget"
+    Properties:
+      Budget:
+        BudgetLimit:
+          Amount: 100
+          Unit: USD
+        TimeUnit: MONTHLY
+        BudgetType: COST
+        CostFilters:
+          AZ:
+            - us-east-1
+            - us-west-1
+            - us-east-1
+            - us-east-2
+            - sa-east-1
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 99
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: andrdal@amazon.com
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+          Subscribers:
+          - SubscriptionType: EMAIL
+            Address: andrdal@amazon.com
+
   ServiceCatalogUser:
     Type: 'AWS::IAM::User'
     Properties:
@@ -408,3 +441,7 @@ Resources:
       PrincipalARN: !GetAtt ServiceCatalogUser.Arn
       PortfolioId: !Ref DataScientistPortfolio
       PrincipalType: IAM
+
+Outputs:
+  BudgetId:
+    Value: !Ref BudgetConfiguration

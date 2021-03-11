@@ -26,6 +26,8 @@ This module creates a new account using Organizations, then calls CloudFormation
 '''
 
 __version__ = '1.1'
+__author__ = '@SYK@'
+__email__ = 'khasnis@'
 
 def get_client(service):
   client = boto3.client(service)
@@ -279,7 +281,7 @@ def main(event,context):
     ServiceCatalogUserPassword = event['ResourceProperties']['ServiceCatalogUserPassword']
     sourcebucket = event['ResourceProperties']['SourceBucket']
     baselinetemplate = event['ResourceProperties']['BaselineTemplate']
-    access_to_billing = "ALLOW"
+    access_to_billing = "DENY"
     scp = None
 
     if (event['RequestType'] == 'Create'):

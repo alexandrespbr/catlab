@@ -57,7 +57,7 @@ Resources:
   AccountVendingPortfolio:
     Type: "AWS::ServiceCatalog::Portfolio"
     Properties:
-      DisplayName: "Account Vending Machine"
+      DisplayName: "Account Vending Machine Sandbox"
       AcceptLanguage: "en"
       ProviderName: "AWS"
 
@@ -68,13 +68,13 @@ Resources:
       Description: "This product is an account vending machine builds a new account"
       Distributor: "Amazon"
       Name: "Account Vending Machine Sandbox"
-      Owner: "AWS"
-      SupportEmail: "andrdal@amazon.com"
+      Owner: "IT Services"
+      SupportEmail: "mspembratel@operacaomulticloud.com"
       SupportUrl: "https://www.amazon.com"
       SupportDescription: "Support Description"
       ProvisioningArtifactParameters:
       -
-        Description: "March 2021"
+        Description: "AVM Sandbox Account Creation"
         Name: "March 2021 v1.0"
         Info:
           LoadTemplateFromURL : !Ref SourceTemplate
