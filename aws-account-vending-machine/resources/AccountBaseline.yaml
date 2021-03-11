@@ -36,17 +36,17 @@ Resources:
         - Notification:
             NotificationType: ACTUAL
             ComparisonOperator: GREATER_THAN
-            Threshold: 99
+            Threshold: 95
           Subscribers:
             - SubscriptionType: EMAIL
-              Address: andrdal@amazon.com
+              Address: mspembratel@operacaomulticloud.com
         - Notification:
             NotificationType: ACTUAL
             ComparisonOperator: GREATER_THAN
             Threshold: 80
           Subscribers:
           - SubscriptionType: EMAIL
-            Address: andrdal@amazon.com
+            Address: mspembratel@operacaomulticloud.com
 
   ServiceCatalogUser:
     Type: 'AWS::IAM::User'

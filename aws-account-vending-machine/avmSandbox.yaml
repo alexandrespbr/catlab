@@ -131,6 +131,13 @@ Resources:
       TagOptionId: !Ref ServiceCatalogTagOption
       ResourceId: !Ref AccountVendingPortfolio
 
+  SSMMasterLambdaArn:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /avm/sandbox/masterarn
+      Type: String
+      Value: !GetAtt AccountBuilderLambda.Arn
+
 Outputs:
   AccountLambda:
     Description: ARN of the account creation lambda function

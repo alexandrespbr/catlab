@@ -318,7 +318,7 @@ def main(event,context):
                 credentials = assume_role(account_id, accountrole)
                 template = get_template(sourcebucket,baselinetemplate)
 
-                #deploy cloudformation template (AccountBaseline.yml)
+                #deploy cloudformation template (AccountBaseline.yaml)
                 stack = deploy_resources(credentials, template, stackname, stackregion, ServiceCatalogUserName, ServiceCatalogUserPassword,account_id)
                 print(stack)
                 print("Baseline setup deployment for account " + account_id + " (" + accountemail + ") complete!")
