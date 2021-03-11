@@ -38,7 +38,7 @@ Parameters:
   OrganizationalUnitName:
     Description: "Name of the organizational unit (OU) to which the account should be moved to."
     Type: String
-    Default: "None"
+    Default: "Sandbox"
     AllowedPattern: ".+"
 
   StackRegion:
