@@ -16,6 +16,34 @@ Parameters:
 
 Resources:
 
+  AdministratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SwitchRoleAdmin
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS: !Sub arn:aws:iam::786154173690:root
+          Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AdministratorAccess
+  AssumeAdministratorRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: "AssumeRolePolicy-SwitchRoleAdmin"
+      Description: "Assume the administrative role"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Sid: "AssumeAdministratorRolePolicy"
+          Effect: "Allow"
+          Action:
+          - "sts:AssumeRole"
+          Resource: !GetAtt AdministratorRole.Arn
+
   BudgetConfiguration:
     Type: "AWS::Budgets::Budget"
     Properties:
