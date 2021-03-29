@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cross-Account Role for Transit Account'
+Parameters:
+  AccountId:
+    Type: String
+    Default: 875199729706
+    Description: Embratel Transit Account id 
+
+Resources:  
+  AdministratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: TransitAccountRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS: !Sub arn:aws:iam::${AccountId}:root
+          Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: "TransitNameChanges"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:*'
+                  - 'lambda:*'
+                  - 'ssm:*'
+                  - 'logs:*'
+                Resource: '*'
