@@ -1,0 +1,457 @@
+Resources:
+  # creates a glue database for flow logs athena tables.
+  VpcFlowLogsAthenaDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      DatabaseInput:
+        Name: 'vpcflowlogsathenadatabasefl0af0b31dcb7649c1d'
+      CatalogId: !Ref AWS::AccountId
+
+  # this section creates glue athenaTables mapped to s3 flow logs bucket
+    # creates a workgroup in Athena for queries.
+  fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+      Description: This workgroup has the queries related to vpc flow logs.
+      State: ENABLED
+      Tags:
+        - Key: "service"
+          Value: "vpc_flow_logs"
+      WorkGroupConfiguration:
+        BytesScannedCutoffPerQuery: 200000000
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        RequesterPaysEnabled: true
+        ResultConfiguration:
+          OutputLocation: s3://vpcflowlogs-local-844361039757-us-east-1
+
+  VpcFlowLogsTotalBytesfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Athena::NamedQuery
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+      - fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+    Properties:
+      Database: !Ref VpcFlowLogsAthenaDatabase
+      Description: "Top 50 pairs of source and destination IP addresses with the most bytes transferred. The start_time and end_time in the WHERE clause are placeholders"
+      Name: VpcFlowLogsTotalBytesTransferredfl0af0b31dcb7649c1ddaily2021041520210415
+      QueryString: >
+        SELECT SUM(bytes) as totalbytes, srcaddr, dstaddr from fl0af0b31dcb7649c1ddaily2021041520210415
+        WHERE start_time=1618486308111 AND end_time=1618486308111
+        GROUP BY srcaddr, dstaddr
+        ORDER BY totalbytes
+        LIMIT 50
+      WorkGroup: !Ref fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+
+
+  VpcFlowLogsTopTalkersfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Athena::NamedQuery
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+      - fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+    Properties:
+      Database: !Ref VpcFlowLogsAthenaDatabase
+      Description: "The top 50 IPs transmitting traffic in your VPC/ENI/Subnet."
+      Name: VpcFlowLogsTopTalkersfl0af0b31dcb7649c1ddaily2021041520210415
+      QueryString: >
+        SELECT srcaddr, sum(bytes) as bytes
+        FROM fl0af0b31dcb7649c1ddaily2021041520210415
+        group by srcaddr
+        order by bytes desc
+        limit 50
+      WorkGroup: !Ref fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+
+
+  VpcFlowLogsSshRdpTrafficfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Athena::NamedQuery
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+      - fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+    Properties:
+      Database: !Ref VpcFlowLogsAthenaDatabase
+      Description: "Monitor SSH and RDP traffic"
+      Name: VpcFlowLogsSshRdpTrafficfl0af0b31dcb7649c1ddaily2021041520210415
+      QueryString: >
+        SELECT *
+        FROM fl0af0b31dcb7649c1ddaily2021041520210415
+        WHERE srcport in (22,3389) OR dstport IN (22, 3389)
+        ORDER BY start_time ASC
+        limit 50
+      WorkGroup: !Ref fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+
+  VpcFlowLogsAdminPortTrafficfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Athena::NamedQuery
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+      - fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+    Properties:
+      Database: !Ref VpcFlowLogsAthenaDatabase
+      Description: "Monitor the traffic on administrative web app ports"
+      Name: VpcFlowLogsAdminPortTrafficfl0af0b31dcb7649c1ddaily2021041520210415
+      QueryString: >
+        SELECT ip, sum(bytes) as total_bytes
+        FROM (
+        SELECT dstaddr as ip,sum(bytes) as bytes
+        FROM fl0af0b31dcb7649c1ddaily2021041520210415
+        GROUP BY 1
+        UNION ALL
+        SELECT srcaddr as ip,sum(bytes) as bytes
+        FROM fl0af0b31dcb7649c1ddaily2021041520210415
+        GROUP BY 1
+        )
+        GROUP BY ip
+        ORDER BY total_bytes
+        DESC LIMIT 10
+      WorkGroup: !Ref fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+
+  VpcFlowLogsRejectedTrafficfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Athena::NamedQuery
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+      - fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+    Properties:
+      Database: !Ref VpcFlowLogsAthenaDatabase
+      Description: "Recorded traffic which was not permitted by the security groups or network ACLs."
+      Name: VpcFlowLogsRejectedTrafficfl0af0b31dcb7649c1ddaily2021041520210415
+      QueryString: >
+        SELECT srcaddr, dstaddr,  count(*) count, traffic_action
+        FROM fl0af0b31dcb7649c1ddaily2021041520210415
+        WHERE traffic_action = 'REJECT'
+        GROUP BY srcaddr, dstaddr, traffic_action
+        ORDER BY count desc
+        LIMIT 25
+      WorkGroup: !Ref fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+
+  VpcFlowLogsTrafficFrmSrcAddrfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Athena::NamedQuery
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+      - fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+    Properties:
+      Database: !Ref VpcFlowLogsAthenaDatabase
+      Description: "Traffic transmitted from a particular source IP address. Here the source address (srcaddr) is a placeholder"
+      Name: VpcFlowLogsTrafficFrmSrcAddrfl0af0b31dcb7649c1ddaily2021041520210415
+      QueryString: >
+        SELECT *
+        FROM fl0af0b31dcb7649c1ddaily2021041520210415
+        WHERE srcaddr = '198.51.100.2'
+        ORDER BY start_time ASC
+        LIMIT 50;
+      WorkGroup: !Ref fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+
+  VpcFlowLogsTrafficFrmSrcAddrfl0af0b31dcb7649c1ddaily2021041520210416:
+    Type: AWS::Athena::NamedQuery
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+      - fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+    Properties:
+      Database: !Ref VpcFlowLogsAthenaDatabase
+      Description: "Query Traffic from a particular destination IP address and destination Port"
+      Name: VpcFlowLogsTrafficFrmSrcAddrfl0af0b31dcb7649c1ddaily2021041520210416
+      QueryString: >
+        SELECT *
+        FROM fl0af0b31dcb7649c1ddaily2021041520210415
+        WHERE dstaddr = '10.148.0.134' AND dstport = 80
+        ORDER BY  start_time ASC limit 50;
+      WorkGroup: !Ref fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+
+  VpcFlowLogsTrafficToDstAddrfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Athena::NamedQuery
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+      - fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+    Properties:
+      Database: !Ref VpcFlowLogsAthenaDatabase
+      Description: "Traffic transmitted from a particular destination IP address. Here the destination address (dstaddr) is a placeholder"
+      Name: VpcFlowLogsTrafficToDstAddrfl0af0b31dcb7649c1ddaily2021041520210415
+      QueryString: >
+        SELECT *
+        FROM fl0af0b31dcb7649c1ddaily2021041520210415
+        WHERE dstaddr = '198.51.100.2'
+        ORDER BY start_time ASC
+        LIMIT 50;
+      WorkGroup: !Ref fl0af0b31dcb7649c1ddaily2021041520210415WorkGroup
+
+  VpcFlowLogsAthenafl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Glue::Table
+    DependsOn:
+      - VpcFlowLogsAthenaDatabase
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref VpcFlowLogsAthenaDatabase
+      TableInput:
+        Description: This table has the schema for vpc flow logs information.
+        Name: fl0af0b31dcb7649c1ddaily2021041520210415
+        PartitionKeys:
+          - Name: year
+            Type: string
+          - Name: month
+            Type: string
+          - Name: day
+            Type: string
+        TableType: EXTERNAL_TABLE
+        StorageDescriptor:
+          Location:  s3://vpcflowlogs-local-844361039757-us-east-1/AWSLogs/844361039757/vpcflowlogs/us-east-1/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          SerdeInfo:
+            Parameters:
+              skip.header.line.count: "1"
+              EXTERNAL: "true"
+              field.delim: ' '
+              serialization.format: ' '
+            SerializationLibrary: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+          Columns:
+            - Name: version
+              Type: int
+            - Name: account_id
+              Type: string
+            - Name: interface_id
+              Type: string
+            - Name: srcaddr
+              Type: string
+            - Name: dstaddr
+              Type: string
+            - Name: srcport
+              Type: int
+            - Name: dstport
+              Type: int
+            - Name: traffic_protocol
+              Type: int
+            - Name: packets
+              Type: int
+            - Name: bytes
+              Type: int
+            - Name: start_time
+              Type: int
+            - Name: end_time
+              Type: int
+            - Name: traffic_action
+              Type: string
+            - Name: log_status
+              Type: string
+
+  # creates an IAM role for lambda function execution permission.
+  VPCFlowLogsAthenaIntegrationLambdaExecutorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: VPCFlowLogsAthenaIntegrationLambdaExecutorPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'glue:GetTable'
+                  - 'glue:CreatePartition'
+                  - 'glue:UpdatePartition'
+                  - 'glue:GetPartition'
+                Resource: "*"
+
+  # creates a lambda function to initialize the partitions based on the config start, end date and frequency.
+  InitializerAsync:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const response = require('./cfn-response');
+          const AWS = require('aws-sdk');
+          const glue = new AWS.Glue();
+
+          exports.handler =  async function(event, context) {
+            let errs = [], status
+            if (event.RequestType === 'Delete') {
+              status = response.SUCCESS
+            } else {
+                console.log("Parsing athena configs")
+                let rp = event.ResourceProperties
+                let confs = rp.athenaIntegrations;
+                let db = rp.dbName
+
+                let errs = []
+
+                for(let i = 0; i < confs.length; i++) {
+                  let cnf = confs[i]
+                  let tab = cnf['partitionTableName']
+                  let frq = cnf['partitionLoadFrequency']
+                  let strt = (cnf['partitionStartDate'] == undefined) ? new Date() : new Date(cnf['partitionStartDate'])
+                  let end = (cnf['partitionEndDate'] == undefined) ? new Date() : new Date(cnf['partitionEndDate'])
+
+                  while(strt <= end) {
+                    let table = await glue.getTable({
+                      DatabaseName: db,
+                      Name: tab,
+                    }).promise()
+
+                    let strgDesc = table.Table['StorageDescriptor']
+                    let Values
+                    let newDate
+
+                    if(frq == "monthly") {
+                      Values = [String(strt.getFullYear()), ("0" + (strt.getMonth() + 1)).slice(-2)]
+                      newDate = strt.setMonth(strt.getMonth() + 1);
+                    } else {
+                      Values = [String(strt.getFullYear()), ("0" + (strt.getMonth() + 1)).slice(-2), String(strt.getDate())]
+                      newDate = strt.setDate(strt.getDate() + 1);
+                    }
+
+                    try {
+                      let result = await glue.getPartition({
+                          DatabaseName: db,
+                          TableName: tab,
+                          PartitionValues: Values
+                      }).promise()
+                    } catch (err) {
+                      if(err.code === 'EntityNotFoundException'){
+                          console.log(strgDesc)
+                          let params = {
+                              DatabaseName: db,
+                              TableName: tab,
+                              PartitionInput: {
+                                  StorageDescriptor: {
+                                      ...strgDesc,
+                                      Location: `${strgDesc.Location}${Values.join('/')}/`
+                                  },
+                                  Values,
+                              },
+                          }
+                          await glue.createPartition(params).promise()
+                      } else {
+                          errs.push(err)
+                      }
+                    }
+                    strt = new Date(newDate);
+                  }
+                }
+
+                status = errs.length > 0 ? response.FAILED : response.SUCCESS
+              }
+              return new Promise(() => response.send(event, context, status,
+              errs.length > 0 ? { error: errs } : {}, event.LogicalResourceId));
+          }
+
+      Handler: 'index.handler'
+      Timeout: 60
+      Runtime: nodejs10.x
+      ReservedConcurrentExecutions: 1
+      Role: !GetAtt VPCFlowLogsAthenaIntegrationLambdaExecutorRole.Arn
+
+  # creates an initial custom trigger for lambda function for partition creation.
+  Initializer2021041520210415:
+    Type: 'Custom::VPCFlowLogsAthenaStartInitializer'
+    DependsOn:
+      - InitializerAsync
+      - VpcFlowLogsAthenafl0af0b31dcb7649c1ddaily2021041520210415
+    Properties:
+      ServiceToken: !GetAtt InitializerAsync.Arn
+      dbName: !Ref VpcFlowLogsAthenaDatabase
+      athenaIntegrations:
+        - partitionTableName: fl0af0b31dcb7649c1ddaily2021041520210415
+          partitionLoadFrequency: daily
+          partitionStartDate: 2021-04-15
+          partitionEndDate: 2021-04-16
+
+  # creates a lambda function for daily partition creation.
+  GluePartitionerfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - VpcFlowLogsAthenafl0af0b31dcb7649c1ddaily2021041520210415
+    Properties:
+      Code:
+        ZipFile: |
+          const AWS = require('aws-sdk');
+          const glue = new AWS.Glue();
+
+          exports.handler = async function(event, context) {
+            let db = event.db
+            let confs = event.athena
+            let today = new Date()
+            let errs = []
+
+            for(let i = 0; i < confs.length; i++) {
+              let cnf = confs[i]
+              let tab = cnf['partitionTableName']
+
+              let table = await glue.getTable({
+                DatabaseName: db,
+                Name: tab,
+              }).promise()
+
+              let strgDesc = table.Table['StorageDescriptor']
+              let Values = [String(today.getFullYear()), ("0" + (today.getMonth() + 1)).slice(-2), String(today.getDate())]
+
+              try {
+                let result = await glue.getPartition({
+                  DatabaseName: db,
+                  TableName: tab,
+                  PartitionValues: Values
+                }).promise()
+              } catch (err) {
+                  if(err.code === 'EntityNotFoundException'){
+                    console.log(strgDesc)
+                    let params = {
+                      DatabaseName: db,
+                      TableName: tab,
+                      PartitionInput: {
+                        StorageDescriptor: {
+                            ...strgDesc,
+                            Location: `${strgDesc.Location}${Values.join('/')}/`
+                        },
+                        Values,
+                      },
+                    }
+                    await glue.createPartition(params).promise()
+                  } else {
+                    errs.push(err)
+                }
+              }
+            }
+
+            return new Promise(function(resolve, reject) { errs.length > 0 ? reject(errs) : resolve("SUCCESS")});
+          }
+      Handler: 'index.handler'
+      Timeout: 30
+      Runtime: nodejs10.x
+      ReservedConcurrentExecutions: 1
+      Role: !GetAtt VPCFlowLogsAthenaIntegrationLambdaExecutorRole.Arn
+
+  # creates event rule for daily lambda function trigger
+  ScheduledEventRulefl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Events::Rule
+    DependsOn: GluePartitionerfl0af0b31dcb7649c1ddaily2021041520210415
+    Properties:
+      Description: This event rule will be invoking lambda based on schedule
+      Name: ScheduledEventRulefl0af0b31dcb7649c1ddaily2021041520210415
+      ScheduleExpression: "cron(0 0 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt GluePartitionerfl0af0b31dcb7649c1ddaily2021041520210415.Arn
+          Id: GluePartitionerfl0af0b31dcb7649c1ddaily2021041520210415
+          Input: "{\"db\": \"\", \"athena\": [ {\"partitionTableName\": \"\"}]}"
+
+  # creates lambda permission for daily schedule
+  ScheduledEventPermissionfl0af0b31dcb7649c1ddaily2021041520210415:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt GluePartitionerfl0af0b31dcb7649c1ddaily2021041520210415.Arn
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt ScheduledEventRulefl0af0b31dcb7649c1ddaily2021041520210415.Arn
+

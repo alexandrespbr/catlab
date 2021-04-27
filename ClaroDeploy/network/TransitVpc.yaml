@@ -13,27 +13,27 @@ Parameters:
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
-    Default: 10.126.2.0/23
+    Default: 10.126.0.0/25
 
   PublicSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
     Type: String
-    Default: 10.126.1.0/25
+    Default: 10.126.0.64/27
 
   PublicSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
     Type: String
-    Default: 10.126.1.128/25
+    Default: 10.126.0.96/27
 
   PrivateSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.126.2.0/24
+    Default: 10.126.0.0/27
 
   PrivateSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.126.3.0/24
+    Default: 10.126.0.32/27
 
   NatGateway: 
     Description: Create NatGateway (Yes or No)?.
@@ -91,13 +91,6 @@ Resources:
         - Key: IsUsedForDeploy
           Value: "True"
 
-  VpcCIDRBlock:
-    DependsOn: VPC
-    Type: AWS::EC2::VPCCidrBlock
-    Properties: 
-      CidrBlock: 10.126.1.0/24
-      VpcId: !Ref VPC
-
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -112,7 +105,6 @@ Resources:
       VpcId: !Ref VPC
 
   PublicSubnet1:
-    DependsOn: VpcCIDRBlock
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
@@ -124,7 +116,6 @@ Resources:
           Value: !Sub ${EnvironmentName} Public Subnet 1
 
   PublicSubnet2:
-    DependsOn: VpcCIDRBlock
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
@@ -136,7 +127,6 @@ Resources:
           Value: !Sub ${EnvironmentName} Public Subnet 2
 
   PrivateSubnet1:
-    DependsOn: VpcCIDRBlock
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
@@ -150,7 +140,6 @@ Resources:
           Value: "True"
 
   PrivateSubnet2:
-    DependsOn: VpcCIDRBlock
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
@@ -214,7 +203,7 @@ Resources:
     DependsOn: TGWAttachment
     Properties:
       RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 10.0.0.0/8
+      DestinationCidrBlock: 10.126.0.0/16
       TransitGatewayId: !Ref TransitGateway01
 
   PublicSubnet1RouteTableAssociation:
@@ -239,12 +228,20 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName} Private Route 01
 
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Condition: CreateNgwResource
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
   DefaultPrivateRoute1Tgw:
     Type: AWS::EC2::Route
     DependsOn: TGWAttachment
     Properties:
       RouteTableId: !Ref PrivateRouteTable1
-      DestinationCidrBlock: 10.0.0.0/8
+      DestinationCidrBlock: 10.126.0.0/16
       TransitGatewayId: !Ref TransitGateway01
 
   PrivateSubnet1RouteTableAssociation:
@@ -253,10 +250,34 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet1
 
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Route 02
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Condition: CreateNgwResource
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  DefaultPrivateRoute2Tgw:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 10.126.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PrivateRouteTable1
+      RouteTableId: !Ref PrivateRouteTable2
       SubnetId: !Ref PrivateSubnet2
 
   TransitGateway01:
@@ -292,16 +313,6 @@ Resources:
       - Key: Name
         Value: !Sub "${EnvironmentName}-Attach"
 
-  # TGWFirewallRouteTable:
-  #   Type: AWS::EC2::TransitGatewayRouteTable
-  #   DependsOn: TGWAttachment
-  #   Condition: CreateTgwResource
-  #   Properties:
-  #     TransitGatewayId: !Ref TransitGateway01
-  #     Tags:
-  #     - Key: Name
-  #       Value: !Sub "Firewall Route Table"
-
   myTGWNetworkResourceShare:
     Type: "AWS::RAM::ResourceShare"
     Condition: CreateTgwResource
@@ -323,7 +334,7 @@ Outputs:
     Description: A reference to the created VPC
     Value: !Ref VPC
     Export:
-      Name: EgressVpcId
+      Name: TransitVpcId
 
   PublicSubnets:
     Description: A list of the public subnets
@@ -337,25 +348,25 @@ Outputs:
     Description: A reference to the public subnet in the 1st Availability Zone
     Value: !Ref PublicSubnet1
     Export:
-      Name: EgressExPublicSubnet1
+      Name: TransitExPublicSubnet1
 
   PublicSubnet2:
     Description: A reference to the public subnet in the 2nd Availability Zone
     Value: !Ref PublicSubnet2
     Export:
-      Name: EgressExPublicSubnet2
+      Name: TransitExPublicSubnet2
 
   PrivateSubnet1:
     Description: A reference to the private subnet in the 1st Availability Zone
     Value: !Ref PrivateSubnet1
     Export:
-      Name: EgressExPrivateSubnet1
+      Name: TransitExPrivateSubnet1
 
   PrivateSubnet2:
     Description: A reference to the private subnet in the 2nd Availability Zone
     Value: !Ref PrivateSubnet2
     Export:
-      Name: EgressExPrivateSubnet2
+      Name: TransitExPrivateSubnet2
 
   myTransitGateway:
     Description: "My TransitGatewaId"
@@ -364,7 +375,7 @@ Outputs:
       Name: TransitGatewayExport
 
   myTransitGatewayAttachment:
-    Description: "My Egress TGW Attachment"
+    Description: "My Transit TGW Attachment"
     Value: !Ref TGWAttachment
     Export:
-      Name: EgressTGWAttachmentId
+      Name: TransitTGWAttachmentId

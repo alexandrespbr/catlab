@@ -4,7 +4,7 @@ Parameters:
   AccountId:
     Type: String
     Default: 844361039757
-    Description: Claro Transit Account id 
+    Description: Dasa Transit Account id 
 
 Resources:  
   AdministratorRole:

@@ -5,58 +5,44 @@ Parameters:
   EnvironmentName:
     Description: An environment name that is prefixed to resource names
     Type: String
-    Default: Monitoring
+    Default: DevDevTools
 
   AWSAccountId:
-    Description: Please enter the AWS Account ID to share this Network (REQUIRED)
+    Description: Please enter the AWS Account ID to share this Network DEV Account (REQUIRED)
     Type: String
-    Default: 603478755266
+    Default: 702155020857
+    AllowedPattern: ".+"
+
+  AWSAccountIdDevTools:
+    Description: Please enter the AWS Account ID to share this Network DEVTools Account (REQUIRED)
+    Type: String
+    Default: 466355648366
     AllowedPattern: ".+"
 
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
-    Default: 10.192.2.0/23
+    Default: 10.126.0.128/25
 
   PublicSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
     Type: String
-    Default: 10.192.2.0/26
+    Default: 10.126.0.192/27
 
   PublicSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
     Type: String
-    Default: 10.192.2.64/26
+    Default: 10.126.0.224/27
 
   PrivateSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.192.2.128/26
+    Default: 10.126.0.128/27
 
   PrivateSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.192.2.192/26
-
-  PrivateSubnet3CIDR:
-    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
-    Type: String
-    Default: 10.192.3.0/26
-
-  PrivateSubnet4CIDR:
-    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
-    Type: String
-    Default: 10.192.3.64/26
-
-  PrivateSubnet5CIDR:
-    Description: Please enter the IP range (CIDR notation) for the TGW Attachment in the first Availability Zone
-    Type: String
-    Default: 10.192.3.224/28
-
-  PrivateSubnet6CIDR:
-    Description: Please enter the IP range (CIDR notation) for the TGW Attachment in the second Availability Zone
-    Type: String
-    Default: 10.192.3.240/28
+    Default: 10.126.0.160/27
 
   PublicNetwork: 
     Description: Create Public Network for Account (Yes or No)?.
@@ -74,6 +60,7 @@ Metadata:
         default: "Network Configuration"
       Parameters:
       - AWSAccountId
+      - AWSAccountIdDevTools
       - EnvironmentName
       - VpcCIDR
     - Label:
@@ -87,10 +74,6 @@ Metadata:
       Parameters:
       - PrivateSubnet1CIDR
       - PrivateSubnet2CIDR
-      - PrivateSubnet3CIDR
-      - PrivateSubnet4CIDR
-      - PrivateSubnet5CIDR
-      - PrivateSubnet6CIDR
 
 Conditions: 
   CreatePublicNetResource: !Equals [ !Ref PublicNetwork, "Yes" ]
@@ -133,7 +116,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+          Value: !Sub ${EnvironmentName} Public Subnet 1
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -147,7 +130,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+          Value: !Sub ${EnvironmentName} Public Subnet 2
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -160,7 +143,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+          Value: !Sub ${EnvironmentName} Private Subnet 1
         - Key: IsUsedForDeploy
           Value: "True"
 
@@ -173,61 +156,9 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+          Value: !Sub ${EnvironmentName} Private Subnet 2
         - Key: IsUsedForDeploy
           Value: "True"
-
-  PrivateSubnet3:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
-      CidrBlock: !Ref PrivateSubnet3CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
-        - Key: IsUsedForDeploy
-          Value: "True"
-
-  PrivateSubnet4:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
-      CidrBlock: !Ref PrivateSubnet4CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
-        - Key: IsUsedForDeploy
-          Value: "True"
-
-  PrivateSubnet5:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
-      CidrBlock: !Ref PrivateSubnet5CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ1)
-        - Key: IsUsedForDeploy
-          Value: "False"
-
-  PrivateSubnet6:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
-      CidrBlock: !Ref PrivateSubnet6CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ2)
-        - Key: IsUsedForDeploy
-          Value: "False"
 
 ##PublicRoutes -->>>
 
@@ -274,8 +205,8 @@ Resources:
           Value: !Sub ${EnvironmentName} Private Route 01
 
   DefaultPrivateRoute1:
-    Type: AWS::EC2::Route
     DependsOn: TGWAttachment
+    Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref PrivateRouteTable1
       DestinationCidrBlock: 0.0.0.0/0
@@ -293,61 +224,7 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet2
 
-  PrivateSubnet3RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable1
-      SubnetId: !Ref PrivateSubnet3
-
-  PrivateSubnet4RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable1
-      SubnetId: !Ref PrivateSubnet4
-
-  PrivateRouteTable5:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName} Private Route TGW 01
-
-  DefaultPrivateRoute5:
-    Type: AWS::EC2::Route
-    DependsOn: TGWAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable5
-      DestinationCidrBlock: 0.0.0.0/0
-      TransitGatewayId: !ImportValue TransitGatewayExport
-
-  PrivateSubnet5RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable5
-      SubnetId: !Ref PrivateSubnet5
-
-  PrivateSubnet6RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable5
-      SubnetId: !Ref PrivateSubnet6
-
-  ##InsertRouteAttachment (Disable IntraVPC NFW Inspection) -->>>
-
-  DefaultRouteToPrivateCIDR1:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !ImportValue InspectionPrivateRouteTable01
-      DestinationCidrBlock: !Ref VpcCIDR
-      TransitGatewayId: !ImportValue TransitGatewayExport
-
-  DefaultRouteToPrivateCIDR2:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !ImportValue InspectionPrivateRouteTable02
-      DestinationCidrBlock: !Ref VpcCIDR
-      TransitGatewayId: !ImportValue TransitGatewayExport
+  ##InsertRouteAttachment
 
   IngressSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -404,83 +281,21 @@ Resources:
       ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
       VpcId: !Ref VPC
 
-  CreateS3Endpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      VpcEndpointType: Interface
-      SubnetIds:
-        - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-      SecurityGroupIds:
-        - !Ref IngressSecurityGroup
-      PrivateDnsEnabled: false
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
-      VpcId: !Ref VPC
-
   TGWAttachment:
     Type: AWS::EC2::TransitGatewayAttachment
     Properties:
       SubnetIds:
-        - !Ref PrivateSubnet5
-        - !Ref PrivateSubnet6
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
       TransitGatewayId: !ImportValue TransitGatewayExport
       VpcId: !Ref VPC
       Tags:
       - Key: Name
         Value: !Sub "${EnvironmentName}-Attach"
 
-  TGWInspectionRouteTable:
-    Type: AWS::EC2::TransitGatewayRouteTable
-    DependsOn: TGWAttachment
-    Properties:
-      TransitGatewayId: !ImportValue TransitGatewayExport
-      Tags:
-      - Key: Name
-        Value: !Sub "${EnvironmentName} Inspection Route Table"
-
-  TGWFirewallRouteToInspection:
-    Type: AWS::EC2::TransitGatewayRoute
-    DependsOn: TGWAttachment
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      TransitGatewayAttachmentId: !ImportValue InspectionTGWAttachmentId
-      TransitGatewayRouteTableId: !Ref TGWInspectionRouteTable
-
-  TGWFirewallRouteToSpoke:
-    Type: AWS::EC2::TransitGatewayRoute
-    DependsOn: TGWAttachment
-    Properties:
-      DestinationCidrBlock: !Ref VpcCIDR
-      TransitGatewayAttachmentId: !Ref TGWAttachment
-      TransitGatewayRouteTableId: !ImportValue FwRouteTable
-
-  TGWSubnetAttachmentFirewallRouteTable1:
-    Type: AWS::EC2::TransitGatewayRouteTableAssociation
-    DeletionPolicy: Retain
-    DependsOn: TGWAttachment
-    Properties:
-      TransitGatewayAttachmentId: !ImportValue InspectionTGWAttachmentId
-      TransitGatewayRouteTableId: !ImportValue FwRouteTable
-
-  TGWSubnetAttachmentFirewallRouteTable2:
-    Type: AWS::EC2::TransitGatewayRouteTableAssociation
-    DeletionPolicy: Retain
-    DependsOn: TGWAttachment
-    Properties:
-      TransitGatewayAttachmentId: !ImportValue EgressTGWAttachmentId
-      TransitGatewayRouteTableId: !ImportValue FwRouteTable
-
-  TGWSubnetAttachmentFirewallRouteTable3:
-    Type: AWS::EC2::TransitGatewayRouteTableAssociation
-    DependsOn: TGWAttachment
-    Properties:
-      TransitGatewayAttachmentId: !Ref TGWAttachment
-      TransitGatewayRouteTableId: !Ref TGWInspectionRouteTable
-
   myPublicNetworkResourceShare:
     Type: "AWS::RAM::ResourceShare"
     Condition: CreatePublicNetResource
-    DependsOn: TGWAttachment
     Properties:
       AllowExternalPrincipals: true
       Name: !Sub "${EnvironmentName} Public Subnet Share"
@@ -489,6 +304,7 @@ Resources:
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet2}"
       Principals:
         - !Ref AWSAccountId
+        - !Ref AWSAccountIdDevTools
       Tags:
         - Key: "Name"
           Value: !Sub "Central ${EnvironmentName} PublicSubnetSharing"
@@ -502,10 +318,9 @@ Resources:
       ResourceArns:
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet1}"
         - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet2}"
-        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet3}"
-        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet4}"
       Principals:
         - !Ref AWSAccountId
+        - !Ref AWSAccountIdDevTools
       Tags:
         - Key: "Name"
           Value: !Sub "Central ${EnvironmentName} PrivateSubnetSharing"
@@ -673,7 +488,7 @@ Resources:
                 Action:
                   - sts:AssumeRole
                 Resource:
-                  - !Sub "arn:aws:iam::${AWSAccountId}:role/AWSControlTowerExecution"
+                  - !Sub "arn:aws:iam::${AWSAccountId}:role/TransitAccountRole"
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
@@ -687,9 +502,3 @@ Outputs:
     Value: !Ref VPC
     Export:
       Name: !Sub "${EnvironmentName}-VPCID"
-
-  mySpoketoInspectionRouteTable:
-    Description: My Inspection Route Table"
-    Value: !Ref TGWInspectionRouteTable
-    Export:
-      Name: !Sub "${EnvironmentName}-FwInspectionTable"

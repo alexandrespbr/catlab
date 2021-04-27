@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template configures Route53 private hosted zones and Authorization to hub VPC in an AVM-vended account for Hybrid DNS capabilities
+
+Parameters:
+  ParentDomainName:
+    Type: String
+    Default: CHANGEME.aws.nowonline.com.br
+    Description: The Parent Domain name used in the Private Hosted Zone to be used in the Application Accounts
+  SNSAssociationTopicArn:
+    Type: String
+    Description: Arn of the SNS Hub Association Topic (Shared Services)
+    Default: arn:aws:sns:us-east-1:844361039757:PrivateHostedZoneAssociationTopic
+  HubPrimaryVPCId:
+    Type: String
+    Description: Hub account Primary VPC Id to associate to private hosted zone
+    Default: vpc-05b7c63782d0aa690
+  HubPrimaryVPCRegion:
+    Type: String
+    Description: Hub account Primary VPC region to associate to private hosted zone
+    Default: us-east-1
+  LocalVPCID:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC Id in the Spoke accounts
+  LogsRetentionInDays:
+    Type: Number
+    Default: 14
+    Description: 'Specifies the number of days you want to retain log events in the specified log group.'
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
+  ChildDomainResolverRuleID:
+    Type: String
+    Description: Rule ID for the Shared Route53 Resolver rule for Child Domains
+    Default: rslvr-rr-61dfb63a943d4cb18
+
+Resources:
+
+  PrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties :
+      Name : !Ref ParentDomainName    
+      VPCs:
+        -
+          VPCRegion: !Ref "AWS::Region"
+          VPCId: !Ref LocalVPCID
+
+  HubAuthorizationCustomResource:
+    Type: Custom::Authorization
+    Properties:
+      ServiceToken: !GetAtt HubAuthorizationLambda.Arn
+      HostedZoneId: !Ref PrivateHostedZone
+      PrimaryVPCId: !Ref HubPrimaryVPCId
+      PrimaryVPCRegion: !Ref HubPrimaryVPCRegion
+      SNSAssociationTopic: !Ref SNSAssociationTopicArn
+  HubAuthorizationLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "Resource * acceptable for this policy."
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: 'lambda.amazonaws.com'
+          Action:
+          - 'sts:AssumeRole'
+      Path: '/'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+      - PolicyName: Route53PrivateZoneAuthorization
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - route53:CreateVPCAssociationAuthorization
+            Resource: !Sub 'arn:${AWS::Partition}:route53:::hostedzone/*'
+      - PolicyName: SNSPublish
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - sns:Publish
+            Resource: !Ref SNSAssociationTopicArn
+      - PolicyName: DeleteBoilerPlateVPC
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Action:
+              - ec2:DeleteVpc
+              Resource: "*"
+  HubAuthorizationLambda: # needs no monitoring because it is used as a custom resource
+    Type: 'AWS::Lambda::Function'
+    DependsOn:
+      - PrivateHostedZone
+    Properties:
+      Code:
+        ZipFile:
+          !Sub |
+          # Import statements
+          import boto3, sys
+          import os
+          import cfnresponse
+          import json
+          from botocore.exceptions import ClientError
+          # Start Lambda function
+          def create_association(event,context):
+            props = event['ResourceProperties']
+            route53 = boto3.client('route53')
+            sns = boto3.client('sns')
+            try:
+              route53.create_vpc_association_authorization(
+                HostedZoneId = f"{props['HostedZoneId']}",
+                VPC={
+                  "VPCRegion": f"{props['PrimaryVPCRegion']}",
+                  "VPCId": f"{props['PrimaryVPCId']}"
+                }
+              )
+              #Paylod for SNS message
+              subject=f"{props['HostedZoneId']} Association Request"
+              payload={
+                "hostedZoneId": f"{props['HostedZoneId']}",
+                "VPCId": f"{props['PrimaryVPCId']}",
+                "VPCRegion": f"{props['PrimaryVPCRegion']}"
+              }
+              sns.publish(
+                TopicArn=f"{props['SNSAssociationTopic']}",
+                Subject=subject,
+                Message=json.dumps(payload)
+              )
+              print("Respond: SUCCESS")
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              return
+            except ClientError as ex:
+              print('Updating Authorization has failed.  See the following error.')
+              print(ex.response['Error']['Message'])
+              print("Respond: FAILED")
+              cfnresponse.send(event, context, cfnresponse.FAILED, ex.response)
+          def lambda_handler(event, context):
+            print(f"Custom::Authorization: {event['RequestType']}")
+            if event['RequestType'] in ["Create","Update"]:
+              print(f"{event['RequestType']}: Authorization Custom Resource")
+              create_association(event,context)
+            # Handle a CloudFormation resource delete event
+            if event['RequestType'] == "Delete":
+              print("Delete: Authorization Custom Resource")
+              # Nothing to delete
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              return
+      Environment:
+        Variables:
+          BP_VPC: !Ref LocalVPCID
+      Handler: 'index.lambda_handler'
+      MemorySize: 128
+      Role: !GetAtt 'HubAuthorizationLambdaRole.Arn'
+      Runtime: 'python3.6'
+      Timeout: 60
+
+  HubAuthorizationLambdaLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${HubAuthorizationLambda}'
+      RetentionInDays: !Ref LogsRetentionInDays
+
+  Route53RuleAssociationChildDomains:
+    Type: "AWS::Route53Resolver::ResolverRuleAssociation"
+    Properties:
+      Name: RuleAssociationforChildDomains
+      ResolverRuleId: !Ref ChildDomainResolverRuleID
+      VPCId: !Ref LocalVPCID

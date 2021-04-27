@@ -1,0 +1,504 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description:  This template deploys a VPC with RAM to new AWS Accounts.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: DevDevTools
+
+  AWSAccountId:
+    Description: Please enter the AWS Account ID to share this Network DEV Account (REQUIRED)
+    Type: String
+    Default: 702155020857
+    AllowedPattern: ".+"
+
+  AWSAccountIdDevTools:
+    Description: Please enter the AWS Account ID to share this Network DEVTools Account (REQUIRED)
+    Type: String
+    Default: 466355648366
+    AllowedPattern: ".+"
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.126.0.128/25
+
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.126.0.192/27
+
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.126.0.224/27
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.126.0.128/27
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.126.0.160/27
+
+  PublicNetwork: 
+    Description: Create Public Network for Account (Yes or No)?.
+    Default: "Yes"
+    Type: String
+    AllowedValues:
+      - "Yes"
+      - "No"
+    ConstraintDescription: must specify Yes or No.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: "Network Configuration"
+      Parameters:
+      - AWSAccountId
+      - AWSAccountIdDevTools
+      - EnvironmentName
+      - VpcCIDR
+    - Label:
+        default: "Public Network Configuration"
+      Parameters:
+      - PublicNetwork
+      - PublicSubnet1CIDR
+      - PublicSubnet2CIDR
+    - Label:
+        default: "Private Network Configuration"
+      Parameters:
+      - PrivateSubnet1CIDR
+      - PrivateSubnet2CIDR
+
+Conditions: 
+  CreatePublicNetResource: !Equals [ !Ref PublicNetwork, "Yes" ]
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Condition: CreatePublicNetResource
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: CreatePublicNetResource
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Condition: CreatePublicNetResource
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet 1
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Condition: CreatePublicNetResource
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet 2
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet 1
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet 2
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+##PublicRoutes -->>>
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Condition: CreatePublicNetResource
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    Condition: CreatePublicNetResource
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreatePublicNetResource
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreatePublicNetResource
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+##PrivateRoutes -->>>
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Route 01
+
+  DefaultPrivateRoute1:
+    DependsOn: TGWAttachment
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayId: !ImportValue TransitGatewayExport
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet2
+
+  ##InsertRouteAttachment
+
+  IngressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "VPC Endpoint Ports Required"
+      VpcId: !Ref VPC
+      GroupName: "My SG Group VPC"
+      SecurityGroupIngress:
+        - FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  CreateVpcEndpointSSM:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      VpcId: !Ref VPC
+
+  CreateVpcEndpointSSMMessages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssmmessages
+      VpcId: !Ref VPC
+
+  CreateVpcEndpointEC2Messages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref IngressSecurityGroup
+      PrivateDnsEnabled: true
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
+      VpcId: !Ref VPC
+
+  TGWAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      TransitGatewayId: !ImportValue TransitGatewayExport
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${EnvironmentName}-Attach"
+
+  myPublicNetworkResourceShare:
+    Type: "AWS::RAM::ResourceShare"
+    Condition: CreatePublicNetResource
+    Properties:
+      AllowExternalPrincipals: true
+      Name: !Sub "${EnvironmentName} Public Subnet Share"
+      ResourceArns:
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet1}"
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PublicSubnet2}"
+      Principals:
+        - !Ref AWSAccountId
+        - !Ref AWSAccountIdDevTools
+      Tags:
+        - Key: "Name"
+          Value: !Sub "Central ${EnvironmentName} PublicSubnetSharing"
+
+  myPrivateMonitoringNetworkResourceShare:
+    Type: "AWS::RAM::ResourceShare"
+    DependsOn: myPublicNetworkResourceShare
+    Properties:
+      AllowExternalPrincipals: true
+      Name: !Sub "${EnvironmentName} Private Subnet Share"
+      ResourceArns:
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet1}"
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet2}"
+      Principals:
+        - !Ref AWSAccountId
+        - !Ref AWSAccountIdDevTools
+      Tags:
+        - Key: "Name"
+          Value: !Sub "Central ${EnvironmentName} PrivateSubnetSharing"
+
+  NameSubnetIds:
+      Type: AWS::Lambda::Function
+      DependsOn: myPrivateMonitoringNetworkResourceShare
+      Properties:
+        Code:
+          ZipFile: |
+            import json
+            import boto3
+            import logging
+            import urllib3
+            import os
+            http = urllib3.PoolManager()
+
+            logger = logging.getLogger(__name__)
+            logging.getLogger().setLevel(logging.INFO)
+
+            SUCCESS = "SUCCESS"
+            FAILED = "FAILED"
+
+            client = boto3.client('ec2')
+            vpcid = os.environ['VPCID']
+            accountid = os.environ['ACCOUNTID']
+
+            def lambda_handler(event, context):
+                logger.info('Event: %s' % json.dumps(event))
+                responseData={}
+                try:
+                    if event['RequestType'] == 'Delete':
+                        print("Request Type:",event['RequestType'])
+                        print("Delete Request - Nothing to delete")
+                    elif event['RequestType'] == 'Create' or event['RequestType'] == 'Update':
+                        print("Request Type:",event['RequestType'])
+                        GETNAMES1=event['ResourceProperties']['GETNAMES1']
+                        GetSubNames1=get_ids(GETNAMES1)
+                        
+                        sts_client = boto3.client('sts')
+
+                        response = sts_client.assume_role(
+                            RoleArn='arn:aws:iam::'+accountid+':role/TransitAccountRole',
+                            RoleSessionName='assume_role_session'
+                        )
+                        
+                        remoteresource = boto3.resource('ec2',
+                                aws_access_key_id=response['Credentials']['AccessKeyId'],
+                                aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+                                aws_session_token=response['Credentials']['SessionToken']
+                        )
+
+                        output = GetSubNames1
+                        try:
+                                for addtags in output:
+                                    names = (addtags[0])
+                                    subnetids = (addtags[1])
+                                    subnet = remoteresource.Subnet(subnetids)
+                                    subnet.create_tags(
+                                        Tags=[
+                                            {
+                                                'Key': 'Name',
+                                                'Value': names
+                                            },
+                                        ]
+                                    )
+                        except Exception as ex:
+                            raise
+                        
+                        responseData={'GetSubNames1':GetSubNames1}
+                        print("Sending CFN")
+                    responseStatus = 'SUCCESS'
+                except Exception as e:
+                    print('Failed to process:', e)
+                    responseStatus = 'FAILURE'
+                    responseData = {'Failure': 'Check Logs.'}
+                send(event, context, responseStatus, responseData)
+
+            def get_ids(GETNAMES1):
+
+                response = client.describe_subnets(
+                    Filters=[ {
+                            'Name': 'vpc-id',
+                            'Values': [vpcid]},
+                            {
+                            'Name': 'tag:IsUsedForDeploy',
+                            'Values': ['True']}
+                    ]
+                )
+
+                tags = []
+                for tag in response['Subnets']:
+                    for value in tag['Tags']:
+                        if value['Key'] == 'Name':
+                            tags.append(value['Value'])
+
+                subnets = []
+                for subnetids in response['Subnets']:
+                    subnets.append(subnetids['SubnetId'])
+
+                output=[(tags[i],subnets[i]) for i in range(0,len(tags))]
+                
+                return output
+                
+            def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
+                responseUrl = event['ResponseURL']
+                print(responseUrl)
+                responseBody = {'Status': responseStatus,
+                                'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
+                                'PhysicalResourceId': physicalResourceId or context.log_stream_name,
+                                'StackId': event['StackId'],
+                                'RequestId': event['RequestId'],
+                                'LogicalResourceId': event['LogicalResourceId'],
+                                'Data': responseData}
+                json_responseBody = json.dumps(responseBody)
+                print("Response body:\n" + json_responseBody)
+                headers = {
+                    'content-type' : '',
+                    'content-length' : str(len(json_responseBody))
+                }
+                try:
+                    response = http.request('PUT', responseUrl, headers=headers, body=json_responseBody)
+                    print("Status code:", response.status)
+                except Exception as e:
+                    print("send(..) failed executing http.request(..):", e)
+        FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EnvironmentName}-SubnetNameApply'
+        Environment:
+          Variables:
+            VPCID: !Ref VPC
+            ACCOUNTID: !Ref AWSAccountId
+        Handler: "index.lambda_handler"
+        Timeout: 30
+        Role: !GetAtt 'LambdaRole.Arn'
+        Runtime: python3.7
+  Lambdatrigger:
+     Type: 'Custom::NameSubIds'
+     DependsOn: myPrivateMonitoringNetworkResourceShare
+     Properties:
+       ServiceToken: !GetAtt 'NameSubnetIds.Arn'
+       GETNAMES1: !Ref NameSubnetIds
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: "lambda-logs"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:Describe*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWSAccountId}:role/TransitAccountRole"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - "arn:aws:logs:*:*:*"
+Outputs:
+  MyVPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${EnvironmentName}-VPCID"

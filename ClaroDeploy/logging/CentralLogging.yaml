@@ -170,7 +170,7 @@ Resources:
         - FirehoseLoggingDeliveryStream
         - Arn
       DestinationPolicy: >-
-        {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["266569595191","221629670022","417359929391","930317599068"]},"Action":"logs:PutSubscriptionFilter","Resource":"arn:aws:logs:us-east-1:790824317059:destination:CentralLogDestination"}]}
+        {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["266569595191","221629670022","417359929391","930317599068","963176782432"]},"Action":"logs:PutSubscriptionFilter","Resource":"arn:aws:logs:us-east-1:790824317059:destination:CentralLogDestination"}]}
   FirehoseLambdaRoleDefaultPolicy:
     Type: 'AWS::IAM::Policy'
     Properties:
